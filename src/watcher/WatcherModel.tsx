@@ -38,10 +38,14 @@ function aerialHaze(shader: WebGLProgramParametersWithUniforms) {
 gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.13, 0.07, 0.34), 1.0 - exp(-length(vViewPosition) / ${(WATCHER.scale * 40).toFixed(1)}));`)
 }
 
-/** The bake stores vertex colours gamma-encoded, to keep 8-bit shadows from banding. */
+/**
+ * The bake stores vertex colours gamma-encoded, to keep 8-bit shadows from banding. The floor
+ * matters: MSAA can extrapolate a colour just below zero, pow() then returns NaN on some GPUs,
+ * and bloom spreads that one pixel into a solid block over the screen.
+ */
 function decodeVertexColor(shader: WebGLProgramParametersWithUniforms) {
   shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-diffuseColor.rgb = pow(diffuseColor.rgb, vec3(2.2));`)
+diffuseColor.rgb = pow(max(diffuseColor.rgb, vec3(1e-4)), vec3(2.2));`)
 }
 
 function upgrade(mesh: Mesh) {

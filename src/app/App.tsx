@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { PerformanceMonitor } from '@react-three/drei'
-import { NoToneMapping, PCFSoftShadowMap } from 'three'
+import { NoToneMapping, PCFShadowMap } from 'three'
 import { UniverseScene } from '../universe/UniverseScene'
 import { Interface } from '../interface/HUD'
 import { useApp } from '../state/store'
@@ -32,7 +32,7 @@ export function App() {
         className="universe"
         dpr={Math.min(window.devicePixelRatio, profile.dpr) * dprScale}
         gl={{ antialias: false, powerPreference: 'high-performance', stencil: false, alpha: false, toneMapping: NoToneMapping }}
-        shadows={{ type: PCFSoftShadowMap }}
+        shadows={{ type: PCFShadowMap }}
         camera={{ fov: 38, near: 1, far: 40000, position: [0, 0, 1000] }}
         frameloop="always"
       >

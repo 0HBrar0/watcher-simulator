@@ -307,7 +307,7 @@ button:focus-visible { outline: 1px solid var(--gold); outline-offset: 4px; bord
 .toast {
   position: absolute;
   left: 50%;
-  top: 34px;
+  top: 84px;
   transform: translateX(-50%);
   font-family: var(--serif);
   font-size: 20px;
