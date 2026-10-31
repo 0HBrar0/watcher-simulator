@@ -1,0 +1,62 @@
+# Architecture
+
+React renders the interface and declares the scene. Everything that changes per frame lives outside
+React state: shader uniforms, `watcherState`, and `Target.position` are mutated in place.
+
+## Data flow
+
+- `planets/planetData.ts` is the source of truth for every body, nebula and galaxy.
+- `planets/PlanetRegistry.ts` turns that into live `Target`s (position, radius, framing). Picking,
+  the camera, the nebula's occluders and the interface all read from it.
+- `state/store.ts` holds interface state. The interface sends camera *requests*; `CameraManager`
+  is the only thing that moves the camera.
+
+## The three independent systems
+
+- **Selection** (`selectedId`) is what the information panel shows.
+- **Camera focus** (`mode`, `focusId`) is where you are.
+- **Observation** (`watcherState.targetId`) is what the Watcher looks at, changed only through
+  `setObservationTarget` in `watcher/ObservationSystem.ts`.
+
+## Camera
+
+`camera/CameraManager.tsx` has one camera in one of three rigs: `orbit`, `travel`, `pov`. Free
+observer and planetary perspective are both `orbit`, differing in pivot and limits. Flights are
+cubic Beziers that bend around bodies (`cameraPath.ts`) and any input cancels them. Arrival points
+are computed relative to the sun, so you always arrive at the lit side of a world.
+
+## Rendering, far to near
+
+1. `Sky`: expensive noise baked once into a cube map, also used as the image-based light.
+2. `Starfield`, `Galaxy`: real points at real depths, for parallax.
+3. Planets: one `ShaderMaterial` for all of them. Fictional worlds are baked on the GPU into
+   equirectangular maps at start-up, so at runtime they cost the same as photo textures.
+4. `Nebula`: fog ray-marched at reduced resolution, sampling a tiling 3D noise texture. Rays stop at
+   planets analytically; the Watcher stays clear through a depth-tested composite plane.
+5. `PostProcessing`: HDR bloom, ACES, violet grade, vignette, grain.
+
+Screen-space AO and depth of field were left out: open space has almost no contact shadow, and his
+occlusion is already baked into vertex colours.
+
+GPU resources from a bake are owned by the effect that created them, because StrictMode runs effects
+twice in development. Creating them in `useMemo` and disposing in an effect leaves empty maps.
+
+## The Watcher
+
+`tools/bake-watcher.mjs` sculpts the character with signed distance fields, polygonises each part
+with surface nets, bakes ambient occlusion and colour into vertices, and writes a standard GLB.
+
+GLB contract: `Head` (required, pivot at the neck), `Eye_L`, `Eye_R` (optional, used for the POV
+camera). Without eyes the POV camera sits at the `Head` pivot, so a replacement should have them.
+Materials named `Skin`, `Cloth`, `Gold`, `Eye` get upgraded in `WatcherModel.tsx`; others are kept.
+
+## Adding a world
+
+Add an entry to `BODIES`. A `textured` surface needs a map in `public/assets/planets`; a `procedural`
+one needs only a palette and noise settings. Nothing else has to change. The nebula shader has room
+for 24 occluders (`MAX_OCCLUDERS`), so raise that past 23 bodies.
+
+## Path tracing and WebGPU
+
+Neither is in this release. Content is data-driven and rendering sits behind `UniverseScene`, so
+either could arrive as a separate renderer without touching data, camera or interface.
