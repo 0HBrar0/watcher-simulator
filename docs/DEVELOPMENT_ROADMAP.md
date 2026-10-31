@@ -25,3 +25,5 @@
   added an astrolabe halo, aerial haze, galaxy glow, softer fog and more room in the interface.
 - 2026-10-31: Reworked camera input so it is precise and independent of frame rate. Added the zoom
   rail, fine control, keyboard shortcuts, speed settings, world stepping and shareable links.
+- 2026-10-31: Gave him a voice, with subtitles timed from the audio and eyes that follow his speech.
+  Plain clicks no longer cancel flights.

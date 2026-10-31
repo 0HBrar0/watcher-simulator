@@ -2,11 +2,12 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import {
   AdditiveBlending, BufferAttribute, BufferGeometry, DirectionalLight, Group, Line as ThreeLine, LineBasicMaterial,
-  Matrix4, Object3D, PointLight, Quaternion, ShaderMaterial, Vector3,
+  Matrix4, Mesh, Object3D, PointLight, Quaternion, ShaderMaterial, Vector3,
 } from 'three'
 import { WATCHER } from '../planets/planetData'
 import { sunPosition } from '../planets/PlanetRegistry'
 import { useApp } from '../state/store'
+import { isVoiced } from '../voice/voice'
 import { useWatcherModel } from './WatcherModel'
 import { watcherState } from './WatcherState'
 import { observationPoint } from './ObservationSystem'
@@ -116,6 +117,7 @@ export function Watcher({ shadowMapSize }: { shadowMapSize: number }) {
   const key = useRef<DirectionalLight>(null)
   const rim = useRef<PointLight>(null)
   const placed = useRef(false)
+  const speaking = useRef(0)
 
   const headRest = useMemo(() => (rig.head ? rig.head.quaternion.clone() : new Quaternion()), [rig])
   const home = useMemo(() => new Vector3(...WATCHER.position), [])
@@ -175,6 +177,13 @@ export function Watcher({ shadowMapSize }: { shadowMapSize: number }) {
       rig.head.getWorldDirection(state.viewDirection)
     }
     rig.root.visible = !state.headHidden
+
+    // His eyes kindle while he speaks.
+    speaking.current += (Number(isVoiced()) - speaking.current) * (1 - Math.exp(-delta * 9))
+    for (const eye of [rig.eyeL, rig.eyeR]) {
+      const uniform = ((eye as Mesh | null)?.material as ShaderMaterial | undefined)?.uniforms?.uSpeak
+      if (uniform) uniform.value = speaking.current
+    }
 
     // The astrolabe behind him keeps turning, each ring at its own pace.
     rig.halos.forEach((halo, i) => halo.rotateZ(delta * HALO_SPEEDS[i]))

@@ -61,6 +61,7 @@ export function useShortcuts() {
         case 'h': toggleInterface(); break
         case 'f': toggleFullscreen(); break
         case 'g': gazeHere(); break
+        case 'v': app.setPrefs({ voice: !app.prefs.voice }); app.notify(app.prefs.voice ? 'His voice is off' : 'His voice is on'); break
         case 'r': app.requestCamera(app.focusId ? { kind: 'focus', id: app.focusId } : { kind: 'overview' }); break
         case '[': stepWorld(-1); break
         case ']': stepWorld(1); break
@@ -89,6 +90,7 @@ const SHEET: [string, string][] = [
   ['G', 'Turn his gaze to the selection'],
   ['M', 'Atlas'],
   ['O', 'Settings'],
+  ['V', 'His voice on or off'],
   ['H', 'Hide the interface'],
   ['F', 'Fullscreen'],
   ['Esc', 'Close, or back to the overview'],

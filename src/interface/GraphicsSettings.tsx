@@ -4,11 +4,11 @@ import { DEFAULT_PREFS } from '../state/prefs'
 
 const LEVELS = Object.keys(QUALITY) as QualityLevel[]
 
-function Speed({ label, value, tabIndex, onChange }: { label: string; value: number; tabIndex: number; onChange: (v: number) => void }) {
+function Slider({ label, value, min = 0.3, max = 2, tabIndex, onChange }: { label: string; value: number; min?: number; max?: number; tabIndex: number; onChange: (v: number) => void }) {
   return (
     <label className="settings__speed">
       <span>{label}</span>
-      <input type="range" min={0.3} max={2} step={0.05} value={value} tabIndex={tabIndex} onChange={(e) => onChange(Number(e.target.value))} />
+      <input type="range" min={min} max={max} step={0.05} value={value} tabIndex={tabIndex} onChange={(e) => onChange(Number(e.target.value))} />
       <output>{value.toFixed(2)}</output>
     </label>
   )
@@ -33,8 +33,17 @@ export function GraphicsSettings() {
           </button>
         ))}
       </div>
-      <Speed label="Drag speed" value={prefs.lookSpeed} tabIndex={tabIndex} onChange={(lookSpeed) => setPrefs({ lookSpeed })} />
-      <Speed label="Zoom speed" value={prefs.zoomSpeed} tabIndex={tabIndex} onChange={(zoomSpeed) => setPrefs({ zoomSpeed })} />
+      <Slider label="Drag speed" value={prefs.lookSpeed} tabIndex={tabIndex} onChange={(lookSpeed) => setPrefs({ lookSpeed })} />
+      <Slider label="Zoom speed" value={prefs.zoomSpeed} tabIndex={tabIndex} onChange={(zoomSpeed) => setPrefs({ zoomSpeed })} />
+      <Slider label="Voice volume" value={prefs.voiceVolume} min={0} max={1} tabIndex={tabIndex} onChange={(voiceVolume) => setPrefs({ voiceVolume })} />
+      <label className="settings__toggle">
+        <input type="checkbox" tabIndex={tabIndex} checked={prefs.voice} onChange={(e) => setPrefs({ voice: e.target.checked })} />
+        His voice
+      </label>
+      <label className="settings__toggle">
+        <input type="checkbox" tabIndex={tabIndex} checked={prefs.subtitles} onChange={(e) => setPrefs({ subtitles: e.target.checked })} />
+        Subtitles
+      </label>
       <label className="settings__toggle">
         <input type="checkbox" tabIndex={tabIndex} checked={showGaze} onChange={(e) => setShowGaze(e.target.checked)} />
         Show his line of sight

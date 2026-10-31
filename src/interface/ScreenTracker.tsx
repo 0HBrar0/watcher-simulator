@@ -6,6 +6,9 @@ import { readout } from '../camera/cameraInput'
 
 const p = new Vector3()
 const RAIL_LINGER = 1.8 // seconds the zoom rail stays after the last zoom
+const SAFE_TOP = 96 // the navigation owns the top of the screen
+const SAFE_BOTTOM = 124 // and the perspective controls the bottom
+const SAFE_SIDE = 84
 let fpsFrames = 0
 let fpsSince = 0
 
@@ -57,7 +60,7 @@ export function ScreenTracker() {
         const y = ((1 - p.y) / 2) * size.height
         const pxRadius = (target.radius / camera.position.distanceTo(target.position)) * size.height / (2 * Math.tan(0.33))
         trackers.label.style.opacity = '1'
-        trackers.label.style.transform = `translate(${x}px, ${Math.max(y - pxRadius - 26, 40)}px) translateX(-50%)`
+        trackers.label.style.transform = `translate(${x}px, ${Math.max(y - pxRadius - 26, SAFE_TOP - 20)}px) translateX(-50%)`
         trackers.label.textContent = target.name
       } else {
         trackers.label.style.opacity = '0'
@@ -77,8 +80,8 @@ export function ScreenTracker() {
       if (show) {
         const a = Math.atan2(p.y, p.x)
         const k = 0.82 / Math.max(Math.abs(Math.cos(a)), Math.abs(Math.sin(a)))
-        const x = ((Math.cos(a) * k + 1) / 2) * size.width
-        const y = ((1 - Math.sin(a) * k) / 2) * size.height
+        const x = Math.min(Math.max(((Math.cos(a) * k + 1) / 2) * size.width, SAFE_SIDE), size.width - SAFE_SIDE)
+        const y = Math.min(Math.max(((1 - Math.sin(a) * k) / 2) * size.height, SAFE_TOP), size.height - SAFE_BOTTOM)
         trackers.locator.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`
         if (trackers.locatorArrow) trackers.locatorArrow.style.transform = `rotate(${-a}rad)`
       }

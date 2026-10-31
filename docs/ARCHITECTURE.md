@@ -22,8 +22,15 @@ React state: shader uniforms, `watcherState`, and `Target.position` are mutated 
 
 `camera/CameraManager.tsx` has one camera in one of three rigs: `orbit`, `travel`, `pov`. Free
 observer and planetary perspective are both `orbit`, differing in pivot and limits. Flights are
-cubic Beziers that bend around bodies (`cameraPath.ts`) and any input cancels them. Arrival points
+cubic Beziers that bend around bodies (`cameraPath.ts`). A drag, a scroll or a movement key cancels them; a plain click does not. Arrival points
 are computed relative to the sun, so you always arrive at the lit side of a world.
+
+## Voice
+
+`voice/lines.ts` holds what he says, with beats measured from the audio. `voice/voice.ts` is the
+only player: one audio element, ranked lines (opening over reactions over musings), and a
+BroadcastChannel so that two open tabs never speak at once. `voice/useVoiceDirector.ts` decides
+when he speaks. `interface/Subtitles.tsx` follows `voiceTime()`, and the eyes follow `isVoiced()`.
 
 ## Rendering, far to near
 

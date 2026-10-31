@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { loadQuality, saveQuality, type QualityLevel } from './quality'
 import { loadPrefs, savePrefs, type Prefs } from './prefs'
+import type { VoiceLine } from '../voice/lines'
 
 export type CameraMode = 'observer' | 'planet' | 'watcher'
 export const WATCHER_ID = 'watcher'
@@ -26,6 +27,8 @@ interface AppState {
   showGaze: boolean
   prefs: Prefs
   toast: { text: string; seconds: number; nonce: number } | null
+  speech: { line: VoiceLine; nonce: number } | null
+  voiceBlocked: boolean // the browser is holding back sound until a click or key press
   observationTarget: string // mirrored from the Watcher's own state for the UI
   request: (CameraRequest & { nonce: number }) | null
 
@@ -37,6 +40,7 @@ interface AppState {
   setQuality: (level: QualityLevel) => void
   setShowGaze: (show: boolean) => void
   setPrefs: (partial: Partial<Prefs>) => void
+  setVoice: (partial: Partial<Pick<AppState, 'speech' | 'voiceBlocked'>>) => void
   notify: (text: string, seconds?: number) => void
   setObservationMirror: (id: string) => void
 }
@@ -58,6 +62,8 @@ export const useApp = create<AppState>((set) => ({
   showGaze: true,
   prefs: loadPrefs(),
   toast: null,
+  speech: null,
+  voiceBlocked: false,
   observationTarget: '',
   request: null,
 
@@ -73,6 +79,7 @@ export const useApp = create<AppState>((set) => ({
     savePrefs(prefs)
     return { prefs }
   }),
+  setVoice: (partial) => set(partial),
   notify: (text, seconds = 2.6) => set({ toast: { text, seconds, nonce: ++nonce } }),
   setObservationMirror: (observationTarget) => set({ observationTarget }),
 }))

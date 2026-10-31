@@ -94,6 +94,8 @@ export function Picking() {
       if (moved > 6 || performance.now() - d.time > 500) return
       const r = rect()
       const app = useApp.getState()
+      // Mid-journey the sky is sliding past, so a click on it means nothing.
+      if (app.travelling && !app.intro) return
       const id = pick(e.clientX - r.left, e.clientY - r.top, r.width, r.height, camera)
       if (!id) { app.select(null); return }
       app.select(id)

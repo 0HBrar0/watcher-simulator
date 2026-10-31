@@ -24,9 +24,10 @@ void main() {
 // Nothing but light behind the slits.
 const eyeFrag = /* glsl */ `
 varying vec3 vN;
+uniform float uSpeak;
 void main() {
   float core = smoothstep(1.0, 0.25, length(vN.xy));
-  gl_FragColor = vec4(mix(vec3(3.2, 1.7, 0.5), vec3(9.0, 6.5, 3.0), core), 1.0);
+  gl_FragColor = vec4(mix(vec3(3.2, 1.7, 0.5), vec3(9.0, 6.5, 3.0), core) * (1.0 + 1.4 * uSpeak), 1.0);
 }`
 
 /**
@@ -125,7 +126,7 @@ totalEmissiveRadiance += mix(vec3(1.0, 0.82, 0.62), vec3(0.62, 0.72, 1.0), robeH
   }
   if (source.name === 'Eye') {
     mesh.castShadow = false
-    return new ShaderMaterial({ vertexShader: eyeVert, fragmentShader: eyeFrag })
+    return new ShaderMaterial({ vertexShader: eyeVert, fragmentShader: eyeFrag, uniforms: { uSpeak: { value: 0 } } })
   }
   return source
 }

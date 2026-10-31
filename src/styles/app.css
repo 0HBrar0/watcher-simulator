@@ -249,7 +249,7 @@ button:focus-visible { outline: 1px solid var(--gold); outline-offset: 4px; bord
 
 
 /* Every overlay below sits directly on the sky: hairlines and type, no panels. */
-.hud--hidden > *:not(.toast):not(.pov) { opacity: 0 !important; visibility: hidden; }
+.hud--hidden > *:not(.toast):not(.pov):not(.subs) { opacity: 0 !important; visibility: hidden; }
 
 .rail {
   position: absolute;
@@ -368,6 +368,72 @@ button:focus-visible { outline: 1px solid var(--gold); outline-offset: 4px; bord
   .modes { bottom: 24px; }
   .modes button { padding: 8px 16px; }
   .pov__caption { white-space: normal; width: 86%; text-align: center; }
+}
+
+/* His words: no plate behind them, only a gold rule and the sky. */
+.subs {
+  position: absolute;
+  left: 50%;
+  bottom: 122px;
+  width: min(880px, calc(100vw - 32px));
+  min-height: 2.6em;
+  transform: translateX(-50%);
+  font-family: var(--serif);
+  font-size: clamp(24px, 2.5vw, 34px);
+  line-height: 1.24;
+  text-align: center;
+  transition: opacity 1.4s ease, filter 1.4s ease, letter-spacing 1.4s ease, transform 1.4s var(--ease), left 0.8s var(--ease);
+  text-shadow: 0 0 22px rgba(14, 6, 40, 0.96), 0 0 8px rgba(14, 6, 40, 0.86), 0 1px 2px rgba(14, 6, 40, 0.8);
+}
+.subs--out { opacity: 0; filter: blur(5px); letter-spacing: 0.05em; transform: translate(-50%, -14px); }
+.subs__rule {
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  width: 168px;
+  height: 1px;
+  margin-left: -84px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  animation: subs-rule 1.6s var(--ease) both;
+}
+@keyframes subs-rule { from { transform: scaleX(0); opacity: 0; } }
+.subs__screen {
+  position: absolute;
+  inset: auto 0 0;
+  font-style: italic;
+  font-weight: 300;
+  opacity: 0;
+  transition: opacity 0.7s ease, filter 0.7s ease, transform 0.7s ease;
+}
+.subs__screen.is-on { opacity: 1; }
+.subs__screen.is-past { filter: blur(4px); transform: translateY(-8px); }
+.subs__word {
+  opacity: 0;
+  color: var(--gold);
+  filter: blur(5px);
+  transition: opacity 0.42s ease, filter 0.5s ease, color 1.3s ease;
+}
+.subs__word.is-said { opacity: 1; color: var(--ink); filter: none; }
+.subs__sound {
+  display: block;
+  margin-bottom: 4px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-style: normal;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+.subs__sound.is-said { opacity: 0.74; }
+.pov--on ~ .subs { bottom: calc(6.5vh + 140px); }
+/* Beside the information panel, his words share the sky with it instead of running under it. */
+.hud:has(.info) .subs { left: calc(50vw - 242px); width: min(760px, calc(100vw - 580px)); }
+.title__hear { margin-top: 22px; font-size: 13px; color: var(--gold); }
+
+@media (max-width: 760px) {
+  .subs { font-size: 22px; bottom: 96px; }
+  .hud:has(.info) .subs { left: 50%; width: calc(100vw - 32px); bottom: auto; top: 76px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

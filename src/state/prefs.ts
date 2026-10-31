@@ -3,9 +3,12 @@ export interface Prefs {
   zoomSpeed: number
   idleDrift: boolean
   showFps: boolean
+  voice: boolean
+  voiceVolume: number
+  subtitles: boolean
 }
 
-export const DEFAULT_PREFS: Prefs = { lookSpeed: 1, zoomSpeed: 1, idleDrift: true, showFps: false }
+export const DEFAULT_PREFS: Prefs = { lookSpeed: 1, zoomSpeed: 1, idleDrift: true, showFps: false, voice: true, voiceVolume: 0.9, subtitles: true }
 
 const KEY = 'watcher.prefs'
 

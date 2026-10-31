@@ -37,11 +37,12 @@ npm run preview   # serves dist/ locally
 | R | Recentre |
 | G | Turn his gaze to the selected world |
 | M, O, ? | Atlas, settings, the list of keys |
+| V | His voice on or off |
 | H | Hide the interface |
 | F | Fullscreen |
 | Click a world | Fly to it |
 | Click the Watcher | Choose: approach, or see through his eyes |
-| Any input mid-flight | Take the camera back |
+| Drag, scroll or fly mid-flight | Take the camera back (a plain click does not) |
 | Esc | Close what is open, then return to the overview |
 
 The zoom rail appears on the right when you zoom and fades by itself. Rest the pointer on the right
@@ -50,6 +51,10 @@ edge to bring it back and drag it. Drag and zoom speed are in Settings, and are 
 
 The bottom control switches between Observer, His eyes and Planetary. Selecting a world never
 changes what the Watcher is observing; use **Turn his gaze here** on a world to do that.
+
+He speaks: an opening line, reactions when you approach him, look through his eyes or reach Earth,
+Titan or Vormir, and quiet thoughts while you explore. Volume, his voice and subtitles are in
+Settings. The lines and their timings are in `src/voice/lines.ts`.
 
 ## Deploying
 
@@ -71,6 +76,8 @@ licensed and credited in `docs/ASSET_CREDITS.md`, and never add extracted film o
 
 ## Known limitations
 
+- Browsers hold back sound until the first click or key press, so a first-time visitor may need one
+  click to hear the opening. The title says so when that happens.
 - Needs WebGL 2. Designed for desktop browsers; touch input is not tuned, and there is no pinch zoom.
 - Changing the graphics level rebuilds the renderer and returns you to the overview.
 - Measured on an Intel UHD integrated GPU only. Before the remaster, at 1280x720: about 32 fps on

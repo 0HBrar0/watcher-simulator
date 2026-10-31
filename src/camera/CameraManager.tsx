@@ -23,6 +23,7 @@ const LOOK_RATE = 0.0021 // radians per pixel at the default field of view
 const WHEEL_RATE = 0.00055 // a standard wheel notch of 100 moves about 5.5%
 const PINCH_BOOST = 6 // trackpad pinches report much smaller deltas than a wheel
 const FINE = 0.25 // holding Alt
+const DRAG_SLOP = 6 // pixels a press must travel before it counts as a drag and not a click
 
 const v1 = new Vector3()
 const v2 = new Vector3()
@@ -72,6 +73,7 @@ export function CameraManager() {
     lastInput: -100,
     dragging: 0, // 0 none, 1 orbit, 2 pan
     px: 0, py: 0,
+    downX: 0, downY: 0,
   }).current
 
   const setOrbitFromCamera = () => {
@@ -207,14 +209,21 @@ export function CameraManager() {
 
     const onDown = (e: PointerEvent) => {
       if (!(e.target instanceof HTMLCanvasElement)) return
-      interrupt()
+      s.lastInput = performance.now() / 1000
       s.dragging = e.button === 0 && !e.shiftKey ? 1 : 2
-      s.px = e.clientX
-      s.py = e.clientY
+      s.px = s.downX = e.clientX
+      s.py = s.downY = e.clientY
       dom.setPointerCapture?.(e.pointerId)
     }
     const onMove = (e: PointerEvent) => {
       if (!s.dragging) return
+      // A click leaves a flight alone; only a real drag takes the camera back.
+      if (s.rig === 'travel') {
+        if (Math.hypot(e.clientX - s.downX, e.clientY - s.downY) < DRAG_SLOP) return
+        stopFlight()
+        s.px = e.clientX
+        s.py = e.clientY
+      }
       const dx = e.clientX - s.px, dy = e.clientY - s.py
       s.px = e.clientX
       s.py = e.clientY
@@ -300,10 +309,13 @@ export function CameraManager() {
     if (request.kind === 'focus') {
       const target = getTarget(request.id)
       if (!target) return
+      // Asking again for where you are already going must not restart the journey.
+      if (s.rig === 'travel' && s.arriveAs === 'orbit' && s.arriveId === request.id) return
       viewpoint(request.id, v3)
       beginFlight(v3.clone(), target.position, durationFor(camera.position, v3), 'orbit', request.id)
       app.setCamera({ mode: request.id === WATCHER_ID ? 'observer' : 'planet', focusId: request.id })
     } else if (request.kind === 'watcherPov') {
+      if (s.rig === 'pov' || (s.rig === 'travel' && s.arriveAs === 'pov')) return
       observationPoint(v1)
       // A long lens: his subject fills the view, the way close attention does.
       const subject = getTarget(watcherState.targetId)

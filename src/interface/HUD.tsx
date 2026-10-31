@@ -7,14 +7,19 @@ import { CameraControls } from './CameraControls'
 import { GraphicsSettings } from './GraphicsSettings'
 import { ZoomRail } from './ZoomRail'
 import { KeySheet, toggleFullscreen, useShortcuts } from './Shortcuts'
+import { Subtitles } from './Subtitles'
+import { useVoiceDirector } from '../voice/useVoiceDirector'
 import { getTarget } from '../planets/PlanetRegistry'
 
 function Title() {
   const intro = useApp((s) => s.intro)
+  const blocked = useApp((s) => s.voiceBlocked)
   return (
     <div className={`title ${intro ? 'title--intro' : ''}`} aria-hidden={!intro}>
       <h1>The Watcher</h1>
       <p>He sees everything. Now, so can you.</p>
+      {/* Any click starts him; this just says so. */}
+      {blocked && <button className="quiet title__hear">Hear him speak</button>}
     </div>
   )
 }
@@ -96,12 +101,14 @@ export function Interface() {
   const away = mode !== 'observer' || !!focusId
   useShortcuts()
   useFirstHint()
+  useVoiceDirector()
 
   return (
     <div className={`hud ${intro ? 'hud--intro' : ''} ${hidden ? 'hud--hidden' : ''}`}>
       <div className="label" ref={(el) => { trackers.label = el }} />
       <Title />
       <PovCaption />
+      <Subtitles />
       <Locator />
       <Toast />
       {intro && <button className="quiet skip" onClick={() => requestCamera({ kind: 'overview' })}>Skip intro</button>}
