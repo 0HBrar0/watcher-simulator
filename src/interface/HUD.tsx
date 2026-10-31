@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useApp, WATCHER_ID } from '../state/store'
 import { trackers } from './ScreenTracker'
 import { PlanetaryIndex } from './PlanetaryIndex'
 import { ObjectInformation } from './ObjectInformation'
 import { CameraControls } from './CameraControls'
 import { GraphicsSettings } from './GraphicsSettings'
+import { ZoomRail } from './ZoomRail'
+import { KeySheet, toggleFullscreen, useShortcuts } from './Shortcuts'
 import { getTarget } from '../planets/PlanetRegistry'
 
 function Title() {
@@ -55,11 +57,30 @@ function Fullscreen() {
     document.addEventListener('fullscreenchange', update)
     return () => document.removeEventListener('fullscreenchange', update)
   }, [])
-  const toggle = useCallback(() => {
-    if (document.fullscreenElement) void document.exitFullscreen()
-    else void document.documentElement.requestFullscreen?.()
-  }, [])
-  return <button className="quiet" onClick={toggle}>{on ? 'Windowed' : 'Fullscreen'}</button>
+  return <button className="quiet" onClick={toggleFullscreen}>{on ? 'Windowed' : 'Fullscreen'}</button>
+}
+
+/** One quiet line at the top of the sky, gone on its own a moment later. */
+function Toast() {
+  const toast = useApp((s) => s.toast)
+  if (!toast) return null
+  return <p className="toast" key={toast.nonce} role="status" style={{ animationDuration: `${toast.seconds}s` }}>{toast.text}</p>
+}
+
+const HINTED = 'watcher.hinted'
+
+/** Shown once, the first time someone has control of the camera. */
+function useFirstHint() {
+  const intro = useApp((s) => s.intro)
+  const notify = useApp((s) => s.notify)
+  useEffect(() => {
+    if (intro) return
+    try {
+      if (localStorage.getItem(HINTED)) return
+      localStorage.setItem(HINTED, '1')
+    } catch { /* storage may be blocked */ }
+    notify('Drag to look. Scroll to zoom. Hold Alt for fine control. Press ? for all the keys.', 8)
+  }, [intro, notify])
 }
 
 export function Interface() {
@@ -70,25 +91,32 @@ export function Interface() {
   const setPanel = useApp((s) => s.setPanel)
   const settingsOpen = useApp((s) => s.settingsOpen)
   const intro = useApp((s) => s.intro)
+  const keysOpen = useApp((s) => s.keysOpen)
+  const hidden = useApp((s) => s.interfaceHidden)
   const away = mode !== 'observer' || !!focusId
+  useShortcuts()
+  useFirstHint()
 
   return (
-    <div className={`hud ${intro ? 'hud--intro' : ''}`}>
+    <div className={`hud ${intro ? 'hud--intro' : ''} ${hidden ? 'hud--hidden' : ''}`}>
       <div className="label" ref={(el) => { trackers.label = el }} />
       <Title />
       <PovCaption />
       <Locator />
+      <Toast />
+      {intro && <button className="quiet skip" onClick={() => requestCamera({ kind: 'overview' })}>Skip intro</button>}
 
       <nav className="corner corner--left">
         <button className="wordmark" onClick={() => requestCamera({ kind: 'overview' })} title="Return to the overview">
           The Watcher
         </button>
-        <button className="quiet" onClick={() => setPanel({ atlasOpen: !atlasOpen })} aria-expanded={atlasOpen}>Atlas</button>
+        <button className="quiet" onClick={() => setPanel({ atlasOpen: !atlasOpen, settingsOpen: false, keysOpen: false })} aria-expanded={atlasOpen}>Atlas</button>
         {away && <button className="quiet" onClick={() => requestCamera({ kind: 'overview' })}>Overview</button>}
       </nav>
 
       <nav className="corner corner--right">
-        <button className="quiet" onClick={() => setPanel({ settingsOpen: !settingsOpen })} aria-expanded={settingsOpen}>Graphics</button>
+        <button className="quiet" onClick={() => setPanel({ settingsOpen: !settingsOpen, atlasOpen: false, keysOpen: false })} aria-expanded={settingsOpen}>Settings</button>
+        <button className="quiet" onClick={() => setPanel({ keysOpen: !keysOpen, atlasOpen: false, settingsOpen: false })} aria-expanded={keysOpen}>Keys</button>
         <Fullscreen />
       </nav>
 
@@ -96,6 +124,9 @@ export function Interface() {
       <GraphicsSettings />
       <ObjectInformation />
       <CameraControls />
+      <ZoomRail />
+      <KeySheet />
+      <p className="fps" ref={(el) => { trackers.fps = el }} />
 
       <footer className="disclaimer">Unofficial, non-commercial fan project. Not affiliated with Marvel or Disney.</footer>
     </div>

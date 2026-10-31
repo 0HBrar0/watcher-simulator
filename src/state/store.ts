@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { loadQuality, saveQuality, type QualityLevel } from './quality'
+import { loadPrefs, savePrefs, type Prefs } from './prefs'
 
 export type CameraMode = 'observer' | 'planet' | 'watcher'
 export const WATCHER_ID = 'watcher'
@@ -19,8 +20,12 @@ interface AppState {
   intro: boolean
   atlasOpen: boolean
   settingsOpen: boolean
+  keysOpen: boolean
+  interfaceHidden: boolean
   quality: QualityLevel
   showGaze: boolean
+  prefs: Prefs
+  toast: { text: string; seconds: number; nonce: number } | null
   observationTarget: string // mirrored from the Watcher's own state for the UI
   request: (CameraRequest & { nonce: number }) | null
 
@@ -28,9 +33,11 @@ interface AppState {
   hover: (id: string | null) => void
   setCamera: (partial: Partial<Pick<AppState, 'mode' | 'focusId' | 'travelling' | 'intro'>>) => void
   requestCamera: (request: CameraRequest) => void
-  setPanel: (partial: Partial<Pick<AppState, 'atlasOpen' | 'settingsOpen'>>) => void
+  setPanel: (partial: Partial<Pick<AppState, 'atlasOpen' | 'settingsOpen' | 'keysOpen' | 'interfaceHidden'>>) => void
   setQuality: (level: QualityLevel) => void
   setShowGaze: (show: boolean) => void
+  setPrefs: (partial: Partial<Prefs>) => void
+  notify: (text: string, seconds?: number) => void
   setObservationMirror: (id: string) => void
 }
 
@@ -45,8 +52,12 @@ export const useApp = create<AppState>((set) => ({
   intro: true,
   atlasOpen: false,
   settingsOpen: false,
+  keysOpen: false,
+  interfaceHidden: false,
   quality: loadQuality(),
   showGaze: true,
+  prefs: loadPrefs(),
+  toast: null,
   observationTarget: '',
   request: null,
 
@@ -57,5 +68,11 @@ export const useApp = create<AppState>((set) => ({
   setPanel: (partial) => set(partial),
   setQuality: (quality) => { saveQuality(quality); set({ quality }) },
   setShowGaze: (showGaze) => set({ showGaze }),
+  setPrefs: (partial) => set((s) => {
+    const prefs = { ...s.prefs, ...partial }
+    savePrefs(prefs)
+    return { prefs }
+  }),
+  notify: (text, seconds = 2.6) => set({ toast: { text, seconds, nonce: ++nonce } }),
   setObservationMirror: (observationTarget) => set({ observationTarget }),
 }))

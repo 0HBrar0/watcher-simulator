@@ -43,17 +43,17 @@ export function Starfield({ count, pixelRatio }: { count: number; pixelRatio: nu
     const phase = new Float32Array(count)
     for (let i = 0; i < count; i++) {
       const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, s = Math.sqrt(1 - u * u)
-      const r = 2600 + Math.pow(Math.random(), 0.6) * 9000
+      const r = 8000 + Math.pow(Math.random(), 0.6) * 16000
       position[i * 3] = s * Math.cos(a) * r
       position[i * 3 + 1] = u * r
       position[i * 3 + 2] = s * Math.sin(a) * r
       const c = PALETTE[Math.floor(Math.random() * PALETTE.length)]
-      const magnitude = Math.pow(Math.random(), 7)
-      const bright = 0.34 + magnitude * 4.5
+      const magnitude = Math.pow(Math.random(), 9)
+      const bright = 0.28 + magnitude * 5
       color[i * 3] = c[0] * bright
       color[i * 3 + 1] = c[1] * bright
       color[i * 3 + 2] = c[2] * bright
-      size[i] = 1.1 + magnitude * 4.5
+      size[i] = 0.9 + magnitude * 2.9
       phase[i] = Math.random()
     }
     const g = new BufferGeometry()
@@ -97,7 +97,7 @@ void main() {
   vFade = smoothstep(1.0, 0.55, d) * smoothstep(0.015, 0.1, d);
   vTint = aSeed;
   gl_Position = projectionMatrix * mv;
-  gl_PointSize = clamp((2.0 + aSeed * 3.0) * uPixel * 90.0 / max(-mv.z, 1.0), 1.0, 11.0 * uPixel);
+  gl_PointSize = clamp((2.0 + aSeed * 3.0) * uPixel * 200.0 / max(-mv.z, 1.0), 1.0, 11.0 * uPixel);
 }`
 
 const dustFrag = /* glsl */ `
@@ -112,7 +112,7 @@ void main() {
 
 /** Foreground motes, for speed and scale. */
 export function CosmicDust({ count, pixelRatio }: { count: number; pixelRatio: number }) {
-  const box = 420
+  const box = 900
   const geometry = useMemo(() => {
     const position = new Float32Array(count * 3)
     const seed = new Float32Array(count)

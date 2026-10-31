@@ -21,6 +21,8 @@ const bodyGoal = new Quaternion()
 const headGoal = new Quaternion()
 const parentQuat = new Quaternion()
 const rimOffset = new Vector3()
+const bodyAim = new Vector3()
+const HALO_SPEEDS = [0.018, -0.03, 0.05]
 
 /** Turns an object's +Z toward a world point, limited to a cone around its rest pose. */
 function aimLimited(object: Object3D, rest: Quaternion, point: Vector3, limit: number, damping: number) {
@@ -37,16 +39,17 @@ const auraVert = /* glsl */ `
 attribute float aSeed;
 varying float vFade;
 uniform float uTime;
+uniform float uReach;
 void main() {
   float life = fract(uTime * 0.018 * (0.4 + aSeed) + aSeed * 7.0);
   vec3 p = position;
   float a = aSeed * 40.0 + life * 2.4;
-  p.xz += vec2(cos(a), sin(a)) * life * 0.5;
-  p.y += life * 2.6;
+  p.xz += vec2(cos(a), sin(a)) * life * 0.7;
+  p.y += life * 3.2;
   vFade = smoothstep(0.0, 0.14, life) * smoothstep(1.0, 0.4, life);
   vec4 mv = modelViewMatrix * vec4(p, 1.0);
   gl_Position = projectionMatrix * mv;
-  gl_PointSize = clamp((1.0 + aSeed * 2.0) * 900.0 / max(-mv.z, 1.0), 1.0, 7.0);
+  gl_PointSize = clamp((0.8 + aSeed * 1.4) * uReach / max(-mv.z, 1.0), 1.0, 4.5);
 }`
 
 const auraFrag = /* glsl */ `
@@ -54,18 +57,18 @@ varying float vFade;
 void main() {
   float r = length(gl_PointCoord * 2.0 - 1.0);
   if (r > 1.0) discard;
-  gl_FragColor = vec4(vec3(0.62, 0.42, 1.6) * pow(1.0 - r, 2.0) * vFade, 1.0);
+  gl_FragColor = vec4(vec3(0.5, 0.34, 1.2) * pow(1.0 - r, 2.0) * vFade * 0.6, 1.0);
 }`
 
 function HemMotes() {
   const geometry = useMemo(() => {
-    const n = 700
+    const n = 1800
     const pos = new Float32Array(n * 3), seed = new Float32Array(n)
     for (let i = 0; i < n; i++) {
-      const a = Math.random() * Math.PI * 2, r = 0.5 + Math.random() * 1.0
+      const a = Math.random() * Math.PI * 2, r = 0.6 + Math.random() * 1.4
       pos[i * 3] = Math.cos(a) * r
-      pos[i * 3 + 1] = -2.2 + Math.random() * 0.5
-      pos[i * 3 + 2] = Math.sin(a) * r - 0.5
+      pos[i * 3 + 1] = -3.9 + Math.random() * 1.2
+      pos[i * 3 + 2] = Math.sin(a) * r - 0.8
       seed[i] = Math.random()
     }
     const g = new BufferGeometry()
@@ -75,7 +78,7 @@ function HemMotes() {
   }, [])
   const material = useMemo(() => new ShaderMaterial({
     vertexShader: auraVert, fragmentShader: auraFrag, blending: AdditiveBlending, transparent: true, depthWrite: false,
-    uniforms: { uTime: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uReach: { value: WATCHER.scale * 70 } },
   }), [])
   useEffect(() => () => { geometry.dispose(); material.dispose() }, [geometry, material])
   useFrame(({ clock }) => { material.uniforms.uTime.value = clock.elapsedTime })
@@ -107,7 +110,7 @@ function GazeLine() {
 }
 
 export function Watcher({ shadowMapSize }: { shadowMapSize: number }) {
-  const rig = useWatcherModel(sunPosition)
+  const rig = useWatcherModel()
   const group = useRef<Group>(null)
   const inner = useRef<Group>(null)
   const key = useRef<DirectionalLight>(null)
@@ -121,42 +124,43 @@ export function Watcher({ shadowMapSize }: { shadowMapSize: number }) {
     const light = key.current
     if (!light) return
     light.target = group.current!
-    const s = WATCHER.scale * 3.4
+    const s = WATCHER.scale * 5
     const c = light.shadow.camera
-    c.left = -s; c.right = s; c.top = s; c.bottom = -s; c.near = 10; c.far = 300
+    c.left = -s; c.right = s; c.top = s; c.bottom = -s; c.near = WATCHER.scale; c.far = WATCHER.scale * 30
     light.shadow.bias = -0.0004
-    light.shadow.normalBias = 0.12
+    light.shadow.normalBias = WATCHER.scale * 0.01
     c.updateProjectionMatrix()
   }, [])
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     if (!group.current || !inner.current) return
     const t = clock.elapsedTime
     const state = watcherState
 
     // He drifts as if suspended in slow water.
     group.current.position.set(
-      home.x + Math.sin(t * 0.11) * 0.8,
-      home.y + Math.sin(t * 0.17) * 2.1,
-      home.z + Math.cos(t * 0.09) * 0.8,
+      home.x + Math.sin(t * 0.07) * WATCHER.scale * 0.04,
+      home.y + Math.sin(t * 0.11) * WATCHER.scale * 0.1,
+      home.z + Math.cos(t * 0.06) * WATCHER.scale * 0.04,
     )
     inner.current.rotation.z = Math.sin(t * 0.13) * 0.012
     inner.current.rotation.x = Math.sin(t * 0.1 + 1) * 0.012
 
-    // The body slowly faces what he is observing, on his own schedule.
+    // The body slowly turns to what he is observing, staying upright; the head does the rest.
     observationPoint(lookTarget)
-    m.lookAt(lookTarget, group.current.position, up)
+    bodyAim.set(lookTarget.x, group.current.position.y, lookTarget.z)
+    m.lookAt(bodyAim, group.current.position, up)
     bodyGoal.setFromRotationMatrix(m)
     group.current.quaternion.slerp(bodyGoal, placed.current ? 0.008 : 1)
     placed.current = true
 
     state.position.copy(group.current.position)
     state.rotation.copy(group.current.quaternion)
-    state.focus.copy(group.current.position).setY(group.current.position.y + WATCHER.scale * 0.9)
+    state.focus.copy(group.current.position).setY(group.current.position.y + WATCHER.scale * 2.3)
 
     if (rig.head) {
       group.current.updateMatrixWorld(true)
-      aimLimited(rig.head, headRest, lookTarget, 0.52, 0.02)
+      aimLimited(rig.head, headRest, lookTarget, 0.3, 0.02)
       rig.head.updateMatrixWorld(true)
       if (rig.eyeL && rig.eyeR) {
         rig.eyeL.getWorldPosition(eyeA)
@@ -169,15 +173,18 @@ export function Watcher({ shadowMapSize }: { shadowMapSize: number }) {
         rig.head.getWorldPosition(state.eyePosition)
       }
       rig.head.getWorldDirection(state.viewDirection)
-      rig.head.visible = !state.headHidden
     }
+    rig.root.visible = !state.headHidden
+
+    // The astrolabe behind him keeps turning, each ring at its own pace.
+    rig.halos.forEach((halo, i) => halo.rotateZ(delta * HALO_SPEEDS[i]))
 
     if (key.current) {
-      key.current.position.copy(group.current.position).add(headWorld.copy(sunPosition).sub(group.current.position).normalize().multiplyScalar(180))
+      key.current.position.copy(group.current.position).add(headWorld.copy(sunPosition).sub(group.current.position).normalize().multiplyScalar(WATCHER.scale * 15))
     }
     if (rim.current) {
       // A cool kicker from behind and to one side, so he separates from the nebula.
-      rim.current.position.copy(group.current.position).add(rimOffset.set(-36, 28, -46).applyQuaternion(group.current.quaternion))
+      rim.current.position.copy(group.current.position).add(rimOffset.set(-2.8, 3, -3.6).multiplyScalar(WATCHER.scale).applyQuaternion(group.current.quaternion))
     }
   })
 
@@ -190,7 +197,7 @@ export function Watcher({ shadowMapSize }: { shadowMapSize: number }) {
         </group>
       </group>
       <directionalLight ref={key} color="#ffe2bd" intensity={2.6} castShadow={shadowMapSize > 0} shadow-mapSize={[shadowMapSize || 512, shadowMapSize || 512]} />
-      <pointLight ref={rim} color="#7a5bff" intensity={16000} distance={260} decay={2} />
+      <pointLight ref={rim} color="#7a5bff" intensity={95 * WATCHER.scale * WATCHER.scale} distance={WATCHER.scale * 22} decay={2} />
       <GazeLine />
     </>
   )

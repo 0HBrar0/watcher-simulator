@@ -47,8 +47,18 @@ twice in development. Creating them in `useMemo` and disposing in an effect leav
 with surface nets, bakes ambient occlusion and colour into vertices, and writes a standard GLB.
 
 GLB contract: `Head` (required, pivot at the neck), `Eye_L`, `Eye_R` (optional, used for the POV
-camera). Without eyes the POV camera sits at the `Head` pivot, so a replacement should have them.
-Materials named `Skin`, `Cloth`, `Gold`, `Eye` get upgraded in `WatcherModel.tsx`; others are kept.
+camera), `Halo_A`, `Halo_B`, `Halo_C` (optional, each spins about its local Z). Without eyes the POV
+camera sits at the `Head` pivot, so a replacement should have them. Materials named `Mask`, `Cloth`,
+`Gold`, `Eye` get upgraded in `WatcherModel.tsx`; others are kept. Vertex colours are gamma-encoded
+by the bake and decoded in the shader, so a replacement using them should do the same.
+
+Input never moves the camera directly. It moves a goal (yaw, pitch, distance, pivot, lens) and the
+camera eases onto that goal over time, so a pixel of drag or a wheel notch means the same at any
+frame rate. `camera/cameraInput.ts` is the bridge to the interface: `readout` goes out and
+`cameraCommands` comes back, without React renders in the camera loop.
+
+Everything that depends on his size (lights, shadows, drift, picking, camera clearance, fog plane)
+derives from `WATCHER.scale`, so resizing him means changing that one number and his position.
 
 ## Adding a world
 

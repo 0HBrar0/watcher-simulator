@@ -1,16 +1,29 @@
 import { useEffect, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { Euler, MathUtils, Matrix4, PerspectiveCamera, Quaternion, Vector3 } from 'three'
-import { UNIVERSE } from '../planets/planetData'
+import { UNIVERSE, WATCHER } from '../planets/planetData'
 import { allTargets, getTarget, sunPosition } from '../planets/PlanetRegistry'
 import { useApp, WATCHER_ID } from '../state/store'
 import { watcherState } from '../watcher/WatcherState'
 import { observationPoint } from '../watcher/ObservationSystem'
 import { buildPath, easeInOut, easeOut, samplePath, type FlightPath } from './cameraPath'
+import { cameraCommands, readout } from './cameraInput'
 
 type Rig = 'orbit' | 'travel' | 'pov'
 
 const BASE_FOV = 38
+const POV_FOV_MIN = 6
+const POV_FOV_MAX = 62
+const FREE_MIN_DIST = 60
+
+// Input moves a goal and the camera eases onto it at a rate set in seconds, so a pixel of drag
+// means the same thing at 20 fps as at 144.
+const RESPONSE = 13
+const LOOK_RATE = 0.0021 // radians per pixel at the default field of view
+const WHEEL_RATE = 0.00055 // a standard wheel notch of 100 moves about 5.5%
+const PINCH_BOOST = 6 // trackpad pinches report much smaller deltas than a wheel
+const FINE = 0.25 // holding Alt
+
 const v1 = new Vector3()
 const v2 = new Vector3()
 const v3 = new Vector3()
@@ -18,6 +31,14 @@ const m1 = new Matrix4()
 const q1 = new Quaternion()
 const up = new Vector3(0, 1, 0)
 const euler = new Euler(0, 0, 0, 'YXZ')
+
+/** Keys that report differently with Shift held still have to release cleanly. */
+const normalKey = (key: string) => {
+  const k = key.toLowerCase()
+  return k === '+' ? '=' : k === '_' ? '-' : k
+}
+const MOTION_KEYS = new Set(['w', 'a', 's', 'd', 'q', 'e'])
+const NUDGE_KEYS = new Set(['arrowleft', 'arrowright', 'arrowup', 'arrowdown', '=', '-'])
 
 /**
  * The one camera. It is always in one of three rigs: orbiting a pivot (free observer and
@@ -32,7 +53,8 @@ export function CameraManager() {
     rig: 'travel' as Rig,
     pivot: new Vector3(...UNIVERSE.overview.pivot),
     yaw: 0, pitch: 0, dist: 500,
-    yawV: 0, pitchV: 0, zoomV: 0, panV: new Vector3(),
+    goalPivot: new Vector3(...UNIVERSE.overview.pivot),
+    goalYaw: 0, goalPitch: 0, goalDist: 500,
     followId: null as string | null,
     minDist: 40, maxDist: 3000,
 
@@ -44,7 +66,8 @@ export function CameraManager() {
     arriveId: null as string | null,
     isIntro: true,
 
-    povFov: 40, povYaw: 0, povPitch: 0, povYawV: 0, povPitchV: 0,
+    povFov: 40, povGoalFov: 40,
+    povYaw: 0, povPitch: 0, povGoalYaw: 0, povGoalPitch: 0,
     keys: new Set<string>(),
     lastInput: -100,
     dragging: 0, // 0 none, 1 orbit, 2 pan
@@ -53,18 +76,19 @@ export function CameraManager() {
 
   const setOrbitFromCamera = () => {
     v1.copy(camera.position).sub(s.pivot)
-    s.dist = v1.length()
-    s.yaw = Math.atan2(v1.x, v1.z)
-    s.pitch = Math.asin(MathUtils.clamp(v1.y / s.dist, -1, 1))
+    s.dist = s.goalDist = v1.length()
+    s.yaw = s.goalYaw = Math.atan2(v1.x, v1.z)
+    s.pitch = s.goalPitch = Math.asin(MathUtils.clamp(v1.y / s.dist, -1, 1))
+    s.goalPivot.copy(s.pivot)
   }
 
   const stopFlight = () => {
     // Keep what the user sees: pivot sits ahead of the camera, along its current view.
     camera.getWorldDirection(v2)
-    const reach = Math.max(s.pivot.distanceTo(camera.position) * 0.5, 60)
+    const reach = Math.max(s.pivot.distanceTo(camera.position) * 0.5, 140)
     s.pivot.copy(camera.position).addScaledVector(v2, reach)
     s.followId = null
-    s.minDist = 12
+    s.minDist = FREE_MIN_DIST
     s.maxDist = UNIVERSE.boundary
     s.rig = 'orbit'
     setOrbitFromCamera()
@@ -102,7 +126,28 @@ export function CameraManager() {
     return out.set(Math.sin(base) * Math.cos(el), Math.sin(el), Math.cos(base) * Math.cos(el)).multiplyScalar(d).add(target.position)
   }
 
-  const durationFor = (from: Vector3, to: Vector3) => MathUtils.clamp(2.4 + from.distanceTo(to) / 900, 3, 7.5)
+  const durationFor = (from: Vector3, to: Vector3) => MathUtils.clamp(2.4 + from.distanceTo(to) / 1500, 3, 8.5)
+
+  /** Near a surface, the same drag should sweep less of it. */
+  const closeness = () => {
+    const target = getTarget(s.followId)
+    return target ? MathUtils.clamp((s.dist - target.radius) / (target.radius * 1.6), 0.22, 1) : 1
+  }
+
+  const applyZoom = (factor: number) => {
+    readout.touched = performance.now() / 1000
+    if (s.rig === 'pov') {
+      s.povGoalFov = MathUtils.clamp(s.povGoalFov * factor, POV_FOV_MIN, POV_FOV_MAX)
+    } else if (s.rig === 'orbit') {
+      const next = s.goalDist * factor
+      if (!s.followId && next < s.minDist) {
+        // In open space there is nothing to stop at, so zooming in becomes flying forward.
+        camera.getWorldDirection(v2)
+        s.goalPivot.addScaledVector(v2, s.minDist - next)
+      }
+      s.goalDist = MathUtils.clamp(next, s.minDist, s.maxDist)
+    }
+  }
 
   useEffect(() => {
     // The opening shot starts wide and slowly settles on the hero composition.
@@ -116,7 +161,7 @@ export function CameraManager() {
     s.fromQuat.copy(camera.quaternion)
     s.lookTo.fromArray(UNIVERSE.overview.pivot)
     s.t = 0
-    s.duration = 13
+    s.duration = 15
     s.arriveAs = 'orbit'
     s.arriveId = null
     s.isIntro = true
@@ -127,6 +172,13 @@ export function CameraManager() {
 
     const params = new URLSearchParams(location.search)
     if (params.has('skipIntro') || !replay) s.t = 0.999
+    // A shared link opens straight on its world.
+    const linked = replay ? params.get('world') : null
+    const linkTimer = linked && getTarget(linked) ? setTimeout(() => {
+      s.t = 0.999
+      useApp.getState().select(linked)
+      useApp.getState().requestCamera({ kind: 'focus', id: linked })
+    }, 0) : undefined
     if (import.meta.env.DEV) {
       // Lets a test harness frame exact shots: __shot([x,y,z],[x,y,z]) or __shot('earth', 3).
       Object.assign(window, {
@@ -137,14 +189,21 @@ export function CameraManager() {
           s.followId = t ? t.id : null
           s.minDist = 1
           s.maxDist = 1e5
-          if (t) { s.pivot.copy(t.position); s.dist = t.radius * (b as number) }
+          if (t) { s.pivot.copy(t.position); s.goalPivot.copy(t.position); s.dist = s.goalDist = t.radius * (b as number) }
           else { s.pivot.fromArray(b as number[]); camera.position.fromArray(a as number[]); setOrbitFromCamera() }
           s.lastInput = 1e12
           useApp.getState().setCamera({ travelling: false, intro: false })
         },
-        __orbit: (yaw: number, pitch: number) => { s.yaw = yaw; s.pitch = pitch },
+        __orbit: (yaw: number, pitch: number) => { s.yaw = s.goalYaw = yaw; s.pitch = s.goalPitch = pitch },
       })
     }
+
+    cameraCommands.zoomTo = (t) => {
+      readout.touched = performance.now() / 1000
+      if (s.rig === 'pov') s.povGoalFov = POV_FOV_MAX * (POV_FOV_MIN / POV_FOV_MAX) ** t
+      else if (s.rig === 'orbit') s.goalDist = s.maxDist * (s.minDist / s.maxDist) ** t
+    }
+    cameraCommands.zoomStep = (direction) => applyZoom(Math.exp(-direction * 0.22))
 
     const onDown = (e: PointerEvent) => {
       if (!(e.target instanceof HTMLCanvasElement)) return
@@ -160,55 +219,75 @@ export function CameraManager() {
       s.px = e.clientX
       s.py = e.clientY
       s.lastInput = performance.now() / 1000
+      const fine = e.altKey ? FINE : 1
+      const look = LOOK_RATE * useApp.getState().prefs.lookSpeed * fine * (camera.fov / BASE_FOV)
       if (s.rig === 'pov') {
-        s.povYawV -= dx * 0.0016
-        s.povPitchV -= dy * 0.0016
+        s.povGoalYaw = MathUtils.clamp(s.povGoalYaw - dx * look, -2.2, 2.2)
+        s.povGoalPitch = MathUtils.clamp(s.povGoalPitch - dy * look, -1.2, 1.2)
       } else if (s.dragging === 1) {
-        s.yawV -= dx * 0.0011
-        s.pitchV += dy * 0.0011
+        s.goalYaw -= dx * look * closeness()
+        s.goalPitch = MathUtils.clamp(s.goalPitch + dy * look * closeness(), -1.45, 1.45)
       } else if (!s.followId) {
-        const k = s.dist * 0.0011
+        // One to one: the point under the cursor stays under the cursor.
+        const k = (2 * s.dist * Math.tan(MathUtils.degToRad(camera.fov / 2)) / dom.clientHeight) * fine
         v1.set(-dx * k, dy * k, 0).applyQuaternion(camera.quaternion)
-        s.panV.add(v1)
+        s.goalPivot.add(v1)
       }
     }
     const onUp = () => { s.dragging = 0 }
     const onWheel = (e: WheelEvent) => {
       e.preventDefault()
       interrupt()
-      if (s.rig === 'pov') {
-        camera.fov = MathUtils.clamp(camera.fov + e.deltaY * 0.01, 10, 62)
-        camera.updateProjectionMatrix()
-      } else {
-        s.zoomV += MathUtils.clamp(e.deltaY, -240, 240) * 0.00042
-      }
+      const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1
+      const pinch = e.ctrlKey ? PINCH_BOOST : 1
+      const amount = MathUtils.clamp(e.deltaY * unit * pinch, -200, 200)
+      applyZoom(Math.exp(amount * WHEEL_RATE * useApp.getState().prefs.zoomSpeed * (e.altKey ? FINE : 1)))
     }
+    // A right-drag pans, so it must not end in the browser's menu.
+    const onContextMenu = (e: Event) => e.preventDefault()
     const onKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement) return
-      const key = e.key.toLowerCase()
-      if ('wasdqe'.includes(key) && key.length === 1) {
+      if (e.target instanceof HTMLInputElement || e.ctrlKey || e.metaKey) return
+      const key = normalKey(e.key)
+      if (key === 'alt') { e.preventDefault(); readout.fine = true; s.keys.add(key) }
+      if (key === 'shift') s.keys.add(key)
+      if (MOTION_KEYS.has(key)) {
         interrupt()
         // Moving means leaving a body or his eyes; go back to free flight.
         if (s.rig === 'pov' || s.followId) useApp.getState().requestCamera({ kind: 'free' })
         s.keys.add(key)
       }
-      if (e.key === 'Escape') useApp.getState().requestCamera({ kind: 'overview' })
+      if (NUDGE_KEYS.has(key)) {
+        e.preventDefault()
+        interrupt()
+        s.keys.add(key)
+      }
     }
-    const onKeyUp = (e: KeyboardEvent) => s.keys.delete(e.key.toLowerCase())
+    const onKeyUp = (e: KeyboardEvent) => {
+      const key = normalKey(e.key)
+      s.keys.delete(key)
+      if (key === 'alt') readout.fine = false
+    }
+    // Keys released while the window is in the background would otherwise stay held.
+    const onBlur = () => { s.keys.clear(); s.dragging = 0; readout.fine = false }
 
     dom.addEventListener('pointerdown', onDown)
     window.addEventListener('pointermove', onMove)
     window.addEventListener('pointerup', onUp)
     dom.addEventListener('wheel', onWheel, { passive: false })
+    dom.addEventListener('contextmenu', onContextMenu)
     window.addEventListener('keydown', onKey)
     window.addEventListener('keyup', onKeyUp)
+    window.addEventListener('blur', onBlur)
     return () => {
+      clearTimeout(linkTimer)
       dom.removeEventListener('pointerdown', onDown)
       window.removeEventListener('pointermove', onMove)
       window.removeEventListener('pointerup', onUp)
       dom.removeEventListener('wheel', onWheel)
+      dom.removeEventListener('contextmenu', onContextMenu)
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('keyup', onKeyUp)
+      window.removeEventListener('blur', onBlur)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [camera, dom])
@@ -229,7 +308,7 @@ export function CameraManager() {
       // A long lens: his subject fills the view, the way close attention does.
       const subject = getTarget(watcherState.targetId)
       const gap = v1.distanceTo(watcherState.eyePosition)
-      s.povFov = subject ? MathUtils.clamp(2 * MathUtils.radToDeg(Math.atan((subject.radius * 5) / gap)), 16, 46) : 40
+      s.povFov = subject ? MathUtils.clamp(2 * MathUtils.radToDeg(Math.atan((subject.radius * 3.4) / gap)), 8, 46) : 40
       beginFlight(watcherState.eyePosition.clone(), v1.clone(), durationFor(camera.position, watcherState.eyePosition) + 1, 'pov', WATCHER_ID)
       app.setCamera({ mode: 'watcher', focusId: null })
     } else if (request.kind === 'overview') {
@@ -252,7 +331,7 @@ export function CameraManager() {
         camera.getWorldDirection(v2)
         s.pivot.copy(camera.position).addScaledVector(v2, Math.max(s.dist * 0.5, 80))
         s.followId = null
-        s.minDist = 12
+        s.minDist = FREE_MIN_DIST
         s.maxDist = UNIVERSE.boundary
         s.rig = 'orbit'
         setOrbitFromCamera()
@@ -265,8 +344,11 @@ export function CameraManager() {
   }, [request])
 
   useFrame((_, rawDelta) => {
-    const delta = Math.min(rawDelta, 0.05)
+    const delta = Math.min(rawDelta, 0.1)
     const now = performance.now() / 1000
+    const ease = 1 - Math.exp(-delta * RESPONSE)
+    const { prefs } = useApp.getState()
+    const pace = (s.keys.has('alt') ? FINE : 1) * (s.keys.has('shift') ? 3 : 1)
 
     if (s.rig === 'travel') {
       s.t = Math.min(1, s.t + delta / s.duration)
@@ -291,8 +373,8 @@ export function CameraManager() {
         const app = useApp.getState()
         if (s.arriveAs === 'pov') {
           s.rig = 'pov'
-          s.povYaw = s.povPitch = 0
-          s.povYawV = s.povPitchV = 0
+          s.povYaw = s.povPitch = s.povGoalYaw = s.povGoalPitch = 0
+          s.povGoalFov = s.povFov
         } else {
           s.rig = 'orbit'
           s.followId = s.arriveId
@@ -303,7 +385,7 @@ export function CameraManager() {
             s.maxDist = target.radius * 16
           } else {
             s.pivot.copy(s.lookTo)
-            s.minDist = 12
+            s.minDist = FREE_MIN_DIST
             s.maxDist = UNIVERSE.boundary
           }
           setOrbitFromCamera()
@@ -315,36 +397,45 @@ export function CameraManager() {
 
     if (s.rig === 'orbit') {
       const target = getTarget(s.followId)
-      if (target) s.pivot.copy(target.position)
 
-      // Damped velocities give everything weight.
-      s.yaw += s.yawV
-      s.pitch = MathUtils.clamp(s.pitch + s.pitchV, -1.45, 1.45)
-      s.dist = MathUtils.clamp(s.dist * Math.exp(s.zoomV), s.minDist, s.maxDist)
-      const damp = Math.exp(-delta * 7.5)
-      s.yawV *= damp
-      s.pitchV *= damp
-      s.zoomV *= Math.exp(-delta * 6)
+      const nudge = delta * 0.75 * prefs.lookSpeed * pace * closeness()
+      if (s.keys.has('arrowleft')) s.goalYaw -= nudge
+      if (s.keys.has('arrowright')) s.goalYaw += nudge
+      if (s.keys.has('arrowup')) s.goalPitch = Math.min(s.goalPitch + nudge, 1.45)
+      if (s.keys.has('arrowdown')) s.goalPitch = Math.max(s.goalPitch - nudge, -1.45)
+      if (s.keys.has('=')) applyZoom(Math.exp(-delta * 0.9 * prefs.zoomSpeed * pace))
+      if (s.keys.has('-')) applyZoom(Math.exp(delta * 0.9 * prefs.zoomSpeed * pace))
 
-      if (!s.followId) {
-        s.pivot.add(s.panV)
-        s.panV.multiplyScalar(Math.exp(-delta * 8))
-        const speed = Math.max(s.dist * 0.9, 90) * delta
+      if (target) {
+        s.pivot.copy(target.position)
+        s.goalPivot.copy(target.position)
+      } else {
+        const speed = Math.max(s.dist * 0.5, 170) * delta * pace
         camera.getWorldDirection(v1)
         v2.crossVectors(v1, up).normalize()
-        if (s.keys.has('w')) s.pivot.addScaledVector(v1, speed)
-        if (s.keys.has('s')) s.pivot.addScaledVector(v1, -speed)
-        if (s.keys.has('a')) s.pivot.addScaledVector(v2, -speed)
-        if (s.keys.has('d')) s.pivot.addScaledVector(v2, speed)
-        if (s.keys.has('e')) s.pivot.addScaledVector(up, speed)
-        if (s.keys.has('q')) s.pivot.addScaledVector(up, -speed)
+        if (s.keys.has('w')) s.goalPivot.addScaledVector(v1, speed)
+        if (s.keys.has('s')) s.goalPivot.addScaledVector(v1, -speed)
+        if (s.keys.has('a')) s.goalPivot.addScaledVector(v2, -speed)
+        if (s.keys.has('d')) s.goalPivot.addScaledVector(v2, speed)
+        if (s.keys.has('e')) s.goalPivot.addScaledVector(up, speed)
+        if (s.keys.has('q')) s.goalPivot.addScaledVector(up, -speed)
         // Beyond the boundary the universe gently hands you back.
-        const over = s.pivot.length() - UNIVERSE.boundary
-        if (over > 0) s.pivot.multiplyScalar(1 - Math.min(over / s.pivot.length(), 1) * 0.05)
+        const over = s.goalPivot.length() - UNIVERSE.boundary
+        if (over > 0) s.goalPivot.multiplyScalar(1 - Math.min(over / s.goalPivot.length(), 1) * 0.05)
+        s.pivot.lerp(s.goalPivot, ease)
       }
 
+      s.yaw += (s.goalYaw - s.yaw) * ease
+      s.pitch += (s.goalPitch - s.pitch) * ease
+      // Distance eases on a log scale, so a zoom feels the same near and far.
+      s.dist = Math.exp(MathUtils.lerp(Math.log(s.dist), Math.log(s.goalDist), ease))
+
       // An idle camera keeps a slow, contemplative drift.
-      if (now - s.lastInput > 6 && !s.dragging) s.yaw += delta * 0.0075 * MathUtils.smoothstep(now - s.lastInput, 6, 12)
+      if (prefs.idleDrift && now - s.lastInput > 6 && !s.dragging) {
+        const drift = delta * 0.0075 * MathUtils.smoothstep(now - s.lastInput, 6, 12)
+        s.yaw += drift
+        s.goalYaw += drift
+      }
 
       const cp = Math.cos(s.pitch)
       camera.position.set(Math.sin(s.yaw) * cp, Math.sin(s.pitch), Math.cos(s.yaw) * cp).multiplyScalar(s.dist).add(s.pivot)
@@ -354,19 +445,33 @@ export function CameraManager() {
         const d = camera.position.distanceTo(body.position), keep = body.radius * 1.06
         if (d < keep) camera.position.sub(body.position).multiplyScalar(keep / d).add(body.position)
       }
+      // He is a column of cloth, so the camera keeps clear of a line running down through him.
+      v3.copy(watcherState.position)
+      v3.y = MathUtils.clamp(camera.position.y, v3.y - WATCHER.scale * 3.2, v3.y + WATCHER.scale * 4.4)
+      const clearance = camera.position.distanceTo(v3), keepOut = WATCHER.scale * 1.75
+      if (clearance < keepOut) camera.position.sub(v3).multiplyScalar(keepOut / clearance).add(v3)
       camera.lookAt(s.pivot)
     }
 
     if (s.rig === 'pov') {
-      s.povYaw = MathUtils.clamp(s.povYaw + s.povYawV, -2.2, 2.2)
-      s.povPitch = MathUtils.clamp(s.povPitch + s.povPitchV, -1.2, 1.2)
-      const damp = Math.exp(-delta * 8)
-      s.povYawV *= damp
-      s.povPitchV *= damp
+      const nudge = delta * 0.5 * prefs.lookSpeed * pace * (camera.fov / BASE_FOV)
+      if (s.keys.has('arrowleft')) s.povGoalYaw = Math.min(s.povGoalYaw + nudge, 2.2)
+      if (s.keys.has('arrowright')) s.povGoalYaw = Math.max(s.povGoalYaw - nudge, -2.2)
+      if (s.keys.has('arrowup')) s.povGoalPitch = Math.min(s.povGoalPitch + nudge, 1.2)
+      if (s.keys.has('arrowdown')) s.povGoalPitch = Math.max(s.povGoalPitch - nudge, -1.2)
+      if (s.keys.has('=')) applyZoom(Math.exp(-delta * 0.9 * prefs.zoomSpeed * pace))
+      if (s.keys.has('-')) applyZoom(Math.exp(delta * 0.9 * prefs.zoomSpeed * pace))
+
       if (now - s.lastInput > 5 && !s.dragging) {
         // Left alone, your gaze relaxes back onto what he is watching.
-        s.povYaw *= 1 - delta * 0.4
-        s.povPitch *= 1 - delta * 0.4
+        s.povGoalYaw *= 1 - delta * 0.4
+        s.povGoalPitch *= 1 - delta * 0.4
+      }
+      s.povYaw += (s.povGoalYaw - s.povYaw) * ease
+      s.povPitch += (s.povGoalPitch - s.povPitch) * ease
+      if (Math.abs(s.povGoalFov - camera.fov) > 0.002) {
+        camera.fov = Math.exp(MathUtils.lerp(Math.log(camera.fov), Math.log(s.povGoalFov), ease))
+        camera.updateProjectionMatrix()
       }
       camera.position.copy(watcherState.eyePosition)
       observationPoint(v1)
@@ -382,10 +487,21 @@ export function CameraManager() {
     for (const body of allTargets) {
       nearest = Math.min(nearest, camera.position.distanceTo(body.position) - body.radius)
     }
-    const near = s.rig === 'pov' ? 0.5 : MathUtils.clamp(nearest * 0.2, 0.3, 40)
+    const near = s.rig === 'pov' ? WATCHER.scale * 0.1 : MathUtils.clamp(nearest * 0.2, 0.3, 90)
     if (Math.abs(near - camera.near) > camera.near * 0.2) {
       camera.near = near
       camera.updateProjectionMatrix()
+    }
+
+    if (s.rig === 'pov') {
+      readout.zoom = Math.log(POV_FOV_MAX / s.povGoalFov) / Math.log(POV_FOV_MAX / POV_FOV_MIN)
+      readout.label = `${(BASE_FOV / camera.fov).toFixed(1)}× lens`
+    } else if (s.rig === 'orbit') {
+      const target = getTarget(s.followId)
+      readout.zoom = Math.log(s.maxDist / s.goalDist) / Math.log(s.maxDist / s.minDist)
+      readout.label = target && target.id !== WATCHER_ID
+        ? `${(s.dist / target.radius).toFixed(1)} radii`
+        : `${Math.round(s.dist).toLocaleString()} units`
     }
   })
 

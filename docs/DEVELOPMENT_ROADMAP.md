@@ -4,7 +4,7 @@
 
 - Baked sky, volumetric nebula, stars, galaxies and dust.
 - 15 worlds and a star, all defined in data.
-- Sculpted original Watcher with independent position, target and gaze.
+- Original masked colossus with independent position, target and gaze.
 - Observer, Watcher POV and Planetary perspectives, with interruptible flights.
 - Atlas, information panel, Watcher locator, four quality levels, adaptive resolution.
 
@@ -21,3 +21,7 @@
 ## Log
 
 - 2026-10-31: First playable. Fixed a StrictMode lifecycle bug that left baked maps empty.
+- 2026-10-31: Remaster. Replaced the figure with an original colossus, spread the worlds about 1.9x,
+  added an astrolabe halo, aerial haze, galaxy glow, softer fog and more room in the interface.
+- 2026-10-31: Reworked camera input so it is precise and independent of frame rate. Added the zoom
+  rail, fine control, keyboard shortcuts, speed settings, world stepping and shareable links.

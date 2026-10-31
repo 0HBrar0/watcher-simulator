@@ -2,21 +2,52 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Vector3 } from 'three'
 import { getTarget } from '../planets/PlanetRegistry'
 import { useApp } from '../state/store'
+import { readout } from '../camera/cameraInput'
 
 const p = new Vector3()
+const RAIL_LINGER = 1.8 // seconds the zoom rail stays after the last zoom
+let fpsFrames = 0
+let fpsSince = 0
 
 /** DOM nodes the 3D loop writes to directly, so labels never trigger a React render. */
 export const trackers = {
   label: null as HTMLElement | null,
   locator: null as HTMLElement | null,
   locatorArrow: null as HTMLElement | null,
+  rail: null as HTMLElement | null,
+  railTrack: null as HTMLElement | null,
+  railThumb: null as HTMLElement | null,
+  railLabel: null as HTMLElement | null,
+  fps: null as HTMLElement | null,
 }
 
 export function ScreenTracker() {
   const size = useThree((s) => s.size)
 
   useFrame(({ camera }) => {
-    const { hoveredId, mode, travelling } = useApp.getState()
+    const { hoveredId, mode, travelling, prefs } = useApp.getState()
+
+    if (trackers.rail && trackers.railThumb && trackers.railLabel) {
+      const now = performance.now() / 1000
+      const awake = (readout.held || now - readout.touched < RAIL_LINGER) && !travelling
+      trackers.rail.classList.toggle('rail--on', awake)
+      if (awake) {
+        const zoom = Math.min(Math.max(readout.zoom, 0), 1)
+        trackers.railThumb.style.top = `${(1 - zoom) * 100}%`
+        trackers.railLabel.textContent = readout.fine ? `${readout.label} · fine` : readout.label
+        trackers.railTrack?.setAttribute('aria-valuenow', String(Math.round(zoom * 100)))
+      }
+    }
+
+    if (trackers.fps) {
+      fpsFrames++
+      const now = performance.now()
+      if (now - fpsSince > 500) {
+        trackers.fps.textContent = prefs.showFps ? `${Math.round((fpsFrames * 1000) / (now - fpsSince))} fps` : ''
+        fpsFrames = 0
+        fpsSince = now
+      }
+    }
 
     if (trackers.label) {
       const target = getTarget(hoveredId)

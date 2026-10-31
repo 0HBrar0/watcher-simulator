@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import {
   CustomBlending, Data3DTexture, HalfFloatType, LinearFilter, Matrix4, Mesh, OneFactor, OneMinusSrcAlphaFactor,
-  OrthographicCamera, PlaneGeometry, RGFormat, RepeatWrapping, Scene, ShaderMaterial, Vector3, Vector4,
+  OrthographicCamera, PlaneGeometry, RGFormat, RepeatWrapping, Scene, ShaderMaterial, Vector2, Vector3, Vector4,
   WebGLRenderTarget, UnsignedByteType, AddEquation,
 } from 'three'
 import { NEBULAE, WATCHER } from '../planets/planetData'
@@ -126,8 +126,15 @@ export function Nebula({ steps, scale }: { steps: number; scale: number }) {
     fragmentShader: /* glsl */ `
       varying vec2 vUv;
       uniform sampler2D uTex;
-      void main() { gl_FragColor = texture2D(uTex, vUv); }`,
-    uniforms: { uTex: { value: target.texture }, uDepth: { value: 1 } },
+      uniform vec2 uTexel;
+      // A small tent filter hides the ray-march dither when the fog runs at low resolution.
+      void main() {
+        vec2 d = uTexel * 1.6;
+        gl_FragColor = texture2D(uTex, vUv) * 0.32
+          + (texture2D(uTex, vUv + vec2(d.x, d.y)) + texture2D(uTex, vUv + vec2(-d.x, d.y))
+          + texture2D(uTex, vUv + vec2(d.x, -d.y)) + texture2D(uTex, vUv + vec2(-d.x, -d.y))) * 0.17;
+      }`,
+    uniforms: { uTex: { value: target.texture }, uDepth: { value: 1 }, uTexel: { value: new Vector2(0.01, 0.01) } },
     transparent: true,
     depthTest: true,
     depthWrite: false,
@@ -142,6 +149,7 @@ export function Nebula({ steps, scale }: { steps: number; scale: number }) {
     const u = pass.material.uniforms
     u.uTime.value = clock.elapsedTime
     u.uCam.value.copy(camera.position)
+    composite.uniforms.uTexel.value.set(1 / target.width, 1 / target.height)
     invViewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse).invert()
     u.uInvViewProj.value.copy(invViewProj)
 
@@ -157,9 +165,10 @@ export function Nebula({ steps, scale }: { steps: number; scale: number }) {
     occluders.forEach((t, i) => u.uOccluders.value[i].set(t.position.x, t.position.y, t.position.z, t.radius))
 
     // The Watcher isn't a sphere, so he is kept in front of the fog with depth instead: the
-    // composite sits just ahead of him, and any fragment nearer than that plane is left clear.
+    // composite sits just behind him, and any fragment nearer than that plane is left clear.
+    // His own material adds back the fog between him and the camera.
     scratch.copy(watcherState.focus).applyMatrix4(camera.matrixWorldInverse)
-    const viewZ = Math.min(scratch.z + WATCHER.scale * 4, -camera.near * 1.01)
+    const viewZ = Math.min(scratch.z - WATCHER.scale * 3, -camera.near * 1.01)
     const clipW = -viewZ
     const clipZ = camera.projectionMatrix.elements[10] * viewZ + camera.projectionMatrix.elements[14]
     composite.uniforms.uDepth.value = scratch.z < 0 ? clipZ / clipW : 1

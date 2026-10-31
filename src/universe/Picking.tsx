@@ -12,12 +12,26 @@ const oc = new Vector3()
 const project = new Vector3()
 const FORGIVENESS_PX = 16
 
-function intersect(target: Target) {
-  oc.copy(ray.ray.origin).sub(target.position)
-  const b = oc.dot(ray.ray.direction), c = oc.dot(oc) - target.radius * target.radius, h = b * b - c
+function hitSphere(center: Vector3, radius: number) {
+  oc.copy(ray.ray.origin).sub(center)
+  const b = oc.dot(ray.ray.direction), c = oc.dot(oc) - radius * radius, h = b * b - c
   if (h < 0) return Infinity
   const t = -b - Math.sqrt(h)
   return t > 0 ? t : Infinity
+}
+
+// He is a tall figure, not a ball: a stack of spheres follows his silhouette (height, radius).
+const FIGURE: [number, number][] = [[3.5, 1.05], [2, 1.35], [0.2, 1.3], [-2, 1.7]]
+const spot = new Vector3()
+
+function intersect(target: Target) {
+  if (target.id !== WATCHER_ID) return hitSphere(target.position, target.radius)
+  let t = Infinity
+  for (const [y, r] of FIGURE) {
+    spot.copy(watcherState.position).setY(watcherState.position.y + y * WATCHER.scale)
+    t = Math.min(t, hitSphere(spot, r * WATCHER.scale))
+  }
+  return t
 }
 
 /**
@@ -44,6 +58,7 @@ function pick(x: number, y: number, width: number, height: number, camera: Persp
     const dx = ((project.x + 1) / 2) * width - x
     const dy = ((1 - project.y) / 2) * height - y
     const screenRadius = (target.radius / camera.position.distanceTo(target.position)) * pxPerUnit
+    if (target.id === WATCHER_ID && screenRadius > 40) continue // already handled by his silhouette
     const d = Math.sqrt(dx * dx + dy * dy) - screenRadius
     if (d < bestDist) { bestDist = d; best = target.id }
   }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react'
-import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, Quaternion, ShaderMaterial, Vector3 } from 'three'
+import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, DoubleSide, Quaternion, ShaderMaterial, Vector3 } from 'three'
 import type { GalaxyData } from '../planets/planetData'
 
 const vert = /* glsl */ `
@@ -20,6 +20,32 @@ void main() {
   float r2 = dot(gl_PointCoord * 2.0 - 1.0, gl_PointCoord * 2.0 - 1.0);
   if (r2 > 1.0) discard;
   gl_FragColor = vec4(vColor * exp(-r2 * 3.0), 1.0);
+}`
+
+const glowVert = /* glsl */ `
+varying vec2 vP;
+void main() {
+  vP = uv * 2.0 - 1.0;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`
+
+// The unresolved light of the disc, so the stars read as a galaxy and not as a cloud of dots.
+const glowFrag = /* glsl */ `
+varying vec2 vP;
+uniform vec3 uCore;
+uniform vec3 uArm;
+uniform float uArms;
+uniform float uTwist;
+void main() {
+  float r = length(vP);
+  if (r >= 1.0) discard;
+  float a = atan(vP.y, vP.x);
+  float wind = cos(uArms * (a - r * uTwist * 3.14159));
+  float arms = pow(0.5 + 0.5 * wind, 2.2) * smoothstep(0.04, 0.26, r) * smoothstep(1.0, 0.42, r);
+  float core = exp(-r * r * 90.0);
+  float disc = exp(-r * 3.6) * smoothstep(1.0, 0.6, r);
+  vec3 c = uCore * (core * 1.5 + disc * 0.1) + uArm * (arms * 0.17 + disc * 0.06);
+  gl_FragColor = vec4(c, 1.0);
 }`
 
 const gauss = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5
@@ -49,7 +75,7 @@ export function Galaxy({ data, points, pixelRatio }: { data: GalaxyData; points:
       } else {
         t = 0.08 + Math.pow(Math.random(), 0.7) * 0.92
         const armIndex = Math.floor(Math.random() * data.arms)
-        const spread = 0.34 + 0.95 * (1.1 - t)
+        const spread = 0.3 + 0.72 * (1.1 - t)
         const a = t * data.twist * Math.PI + (armIndex / data.arms) * Math.PI * 2 + gauss() * spread
         x = Math.cos(a) * t
         z = Math.sin(a) * t
@@ -63,7 +89,7 @@ export function Galaxy({ data, points, pixelRatio }: { data: GalaxyData; points:
       col[i * 3] = c.r * fade
       col[i * 3 + 1] = c.g * fade
       col[i * 3 + 2] = c.b * fade
-      size[i] = 1.2 + Math.random() * (inBulge ? 4 : 2.4)
+      size[i] = 0.9 + Math.random() * (inBulge ? 2.2 : 1.3)
     }
     const g = new BufferGeometry()
     g.setAttribute('position', new BufferAttribute(pos, 3))
@@ -81,16 +107,29 @@ export function Galaxy({ data, points, pixelRatio }: { data: GalaxyData; points:
     uniforms: { uPixel: { value: pixelRatio } },
   }), [pixelRatio])
 
-  useEffect(() => () => { geometry.dispose(); material.dispose() }, [geometry, material])
+  const glow = useMemo(() => new ShaderMaterial({
+    vertexShader: glowVert,
+    fragmentShader: glowFrag,
+    blending: AdditiveBlending,
+    transparent: true,
+    depthWrite: false,
+    side: DoubleSide,
+    uniforms: {
+      uCore: { value: new Color(...data.core) },
+      uArm: { value: new Color(...data.arm) },
+      uArms: { value: data.arms },
+      uTwist: { value: data.twist },
+    },
+  }), [data])
+
+  useEffect(() => () => { geometry.dispose(); material.dispose(); glow.dispose() }, [geometry, material, glow])
 
   return (
-    <points
-      geometry={geometry}
-      material={material}
-      position={data.position}
-      quaternion={quaternion}
-      frustumCulled={false}
-      renderOrder={-800}
-    />
+    <group position={data.position} quaternion={quaternion}>
+      <mesh material={glow} rotation={[-Math.PI / 2, 0, 0]} frustumCulled={false} renderOrder={-801}>
+        <planeGeometry args={[data.radius * 2.1, data.radius * 2.1]} />
+      </mesh>
+      <points geometry={geometry} material={material} frustumCulled={false} renderOrder={-800} />
+    </group>
   )
 }

@@ -1,5 +1,6 @@
 import { useApp, WATCHER_ID } from '../state/store'
 import { getTarget } from '../planets/PlanetRegistry'
+import { stepWorld } from './Shortcuts'
 
 export function CameraControls() {
   const mode = useApp((s) => s.mode)
@@ -18,9 +19,11 @@ export function CameraControls() {
 
   return (
     <div className="modes" role="group" aria-label="Camera perspective">
+      <button className="modes__step" aria-label="Previous world" title="Previous world ([)" onClick={() => stepWorld(-1)}>‹</button>
       {options.map((o) => (
         <button key={o.id} className={mode === o.id ? 'is-current' : ''} aria-pressed={mode === o.id} onClick={o.on}>{o.label}</button>
       ))}
+      <button className="modes__step" aria-label="Next world" title="Next world (])" onClick={() => stepWorld(1)}>›</button>
     </div>
   )
 }

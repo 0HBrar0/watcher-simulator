@@ -21,7 +21,7 @@ function useWatcherRelation(id: string | null) {
     const update = () => {
       const here = getTarget(id)!, there = getTarget(observed)
       const gap = here.position.distanceTo(watcherState.position)
-      const nearby = gap < here.radius * 8 + 120 ? 'He is close by' : gap < 1500 ? 'He is visible from here' : 'He is far from here'
+      const nearby = gap < here.radius * 8 + 1600 ? 'He is close by' : gap < 4200 ? 'He looms over this world' : 'He is distant from here'
       setLine(observed === id ? 'The Watcher is observing this world.' : `${nearby}, observing ${there?.name}.`)
     }
     update()
@@ -39,10 +39,20 @@ export function ObjectInformation() {
   const observed = useApp((s) => s.observationTarget)
   const mode = useApp((s) => s.mode)
   const relation = useWatcherRelation(selectedId)
+  const notify = useApp((s) => s.notify)
 
   if (!selectedId || (mode === 'watcher' && selectedId === WATCHER_ID)) return null
   const info = describe(selectedId)
   const isWatcher = selectedId === WATCHER_ID
+
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(`${location.origin}${location.pathname}?world=${selectedId}`)
+      notify('Link copied')
+    } catch {
+      notify('Could not reach the clipboard')
+    }
+  }
 
   return (
     <section className="info" key={selectedId}>
@@ -65,6 +75,7 @@ export function ObjectInformation() {
         {!isWatcher && (
           <button className="quiet" onClick={() => { select(WATCHER_ID); requestCamera({ kind: 'focus', id: WATCHER_ID }) }}>Find the Watcher</button>
         )}
+        <button className="quiet" onClick={copyLink}>Copy link</button>
         <button className="quiet" onClick={() => select(null)}>Dismiss</button>
       </div>
     </section>

@@ -1,4 +1,4 @@
-// Sculpts the original Watcher character as signed distance fields, polygonises it with
+// Sculpts the original masked Watcher as signed distance fields, polygonises it with
 // surface nets, bakes ambient occlusion and colour into vertices, and writes a standard GLB.
 // Run: npm run bake:watcher
 // Node contract (see docs/ARCHITECTURE.md): Head (pivot at neck), Eye_L, Eye_R.
@@ -37,84 +37,47 @@ function vnoise(x, y, z) {
     mix(mix(l(0, 0, 1), l(1, 0, 1), u), mix(l(0, 1, 1), l(1, 1, 1), u), v), w)
 }
 
-// ---------------------------------------------------------------- The head
-// Authored in head space: cranium centre at origin, face toward +Z, roughly 1.4 tall.
-export const EYE = { x: 0.178, y: -0.075, z: 0.43, r: 0.082 }
+// ---------------------------------------------------------------- The mask
+// Authored in head space: mask centre at origin, face toward +Z, roughly 1.3 tall.
+// An original design: a blank porcelain oval with two narrow slits, repaired with gold seams.
+export const EYE = { x: 0.17, y: 0.03, z: 0.34, r: 0.05 }
 
 function headSdf(x0, y, z) {
   const x = Math.abs(x0)
-  // skull: the famously oversized dome, long toward the back
-  let d = ellipsoid(x, y, z, 0, 0.24, -0.1, 0.62, 0.68, 0.74)
-  d = smin(d, ellipsoid(x, y, z, 0, -0.18, 0.17, 0.375, 0.5, 0.36), 0.14)
-  // jaw and chin
-  d = smin(d, ellipsoid(x, y, z, 0.1, -0.5, 0.16, 0.2, 0.17, 0.26), 0.1)
-  d = smin(d, ellipsoid(x, y, z, 0, -0.655, 0.3, 0.115, 0.085, 0.105), 0.09)
-  // zygomatic arch, cheek hollow
-  d = smin(d, ellipsoid(x, y, z, 0.285, -0.2, 0.33, 0.1, 0.06, 0.11), 0.08)
-  d = smax(d, -ellipsoid(x, y, z, 0.37, -0.42, 0.3, 0.13, 0.13, 0.17), 0.1)
-  // heavy, contemplative brow
-  d = smin(d, capsule(x, y, z, 0.03, 0.03, 0.535, 0.2, 0.05, 0.5, 0.074, 0.08), 0.08)
-  d = smin(d, capsule(x, y, z, 0.2, 0.05, 0.5, 0.36, -0.03, 0.345, 0.08, 0.044), 0.07)
-  // eye sockets
-  d = smax(d, -ellipsoid(x, y, z, EYE.x, EYE.y, EYE.z + 0.06, 0.125, 0.082, 0.11), 0.05)
-  // eyelids: a shell over the eyeball with an almond slit cut through it
-  d = smin(d, sphere(x, y, z, EYE.x, EYE.y, EYE.z, EYE.r + 0.012), 0.022)
-  {
-    const tilt = (x - EYE.x) * 0.2
-    const slit = ellipsoid(x, y - tilt, z, EYE.x, EYE.y - 0.012, EYE.z + EYE.r, 0.07, 0.0185, 0.07)
-    d = smax(d, -slit, 0.012)
-  }
-  // lower-lid bag and upper-lid fold
-  d = smin(d, capsule(x, y, z, 0.11, -0.142, 0.487, 0.255, -0.122, 0.425, 0.012), 0.024)
-  d = smin(d, capsule(x, y, z, 0.1, -0.006, 0.507, 0.262, -0.032, 0.438, 0.011), 0.02)
-  // nose
-  d = smin(d, capsule(x, y, z, 0, 0.0, 0.535, 0, -0.245, 0.625, 0.042, 0.05), 0.045)
-  d = smin(d, sphere(x, y, z, 0, -0.272, 0.635, 0.05), 0.03)
-  d = smin(d, ellipsoid(x, y, z, 0.062, -0.292, 0.57, 0.04, 0.032, 0.046), 0.022)
-  d = smax(d, -ellipsoid(x, y, z, 0.03, -0.322, 0.595, 0.018, 0.012, 0.024), 0.012)
-  // nasolabial crease
-  d = smax(d, -capsule(x, y, z, 0.098, -0.275, 0.545, 0.17, -0.47, 0.462, 0.008, 0.005), 0.03)
-  // lips
-  const philtrum = 0.008 * Math.exp(-x * x / 0.0005)
-  d = smin(d, ellipsoid(x, y, z, 0.045, -0.425 + philtrum, 0.5, 0.078, 0.017, 0.036), 0.026)
-  d = smin(d, ellipsoid(x, y, z, 0.03, -0.463, 0.49, 0.068, 0.021, 0.036), 0.026)
-  d = smax(d, -capsule(x, y, z, 0, -0.444, 0.545, 0.14, -0.452, 0.47, 0.006, 0.004), 0.008)
-  d = smax(d, -ellipsoid(x, y, z, 0, -0.53, 0.49, 0.08, 0.016, 0.03), 0.03)
-  // ears
-  {
-    const ear = ellipsoid(x, y, z + (y + 0.12) * 0.22, 0.575, -0.13, -0.05, 0.05, 0.165, 0.095)
-    const bowl = ellipsoid(x, y, z + (y + 0.12) * 0.22, 0.63, -0.13, -0.035, 0.05, 0.11, 0.058)
-    d = smin(d, smax(ear, -bowl, 0.02), 0.03)
-  }
-  // neck and tendons
-  d = smin(d, capsule(x, y, z, 0, -0.42, -0.08, 0, -1.3, -0.2, 0.27, 0.33), 0.13)
-  d = smin(d, capsule(x, y, z, 0.17, -0.5, -0.02, 0.05, -1.15, 0.1, 0.05, 0.05), 0.09)
-  // forehead lines and a temporal vein: tiny, only read as light catching skin
-  const brow = smoothstep(0.1, 0.2, y) * (1 - smoothstep(0.42, 0.56, y)) * smoothstep(-0.05, 0.3, z)
-  d += brow * 0.0016 * Math.sin((y + 0.03 * Math.cos(x * 6)) * 34)
-  d -= 0.008 * Math.exp(-Math.pow((y - 0.26 - 0.18 * Math.sin(z * 5.2)) / 0.012, 2)) * smoothstep(0.3, 0.5, x)
-  return d
+  const narrow = 1 + 0.42 * clamp(-y / 0.7, 0, 1)
+  let d = ellipsoid(x * narrow, y, z, 0, 0.02, 0.02, 0.46, 0.66, 0.42)
+  // one long plane down the centre, and a shallow brow carried out from it
+  d = smin(d, capsule(x, y, z, 0, 0.2, 0.43, 0, -0.2, 0.475, 0.016, 0.026), 0.1)
+  d = smin(d, capsule(x, y, z, 0.02, 0.17, 0.42, 0.34, 0.14, 0.26, 0.024, 0.014), 0.08)
+  // the slits
+  d = smax(d, -ellipsoid(x, y, z, EYE.x, EYE.y, EYE.z + 0.03, 0.13, 0.03, 0.05), 0.03)
+  const tilt = (x - EYE.x) * 0.28
+  d = smax(d, -ellipsoid(x, y - tilt, z, EYE.x, EYE.y, EYE.z + 0.03, 0.11, 0.011, 0.1), 0.004)
+  // a single engraved line where a mouth would be
+  d = smax(d, -capsule(x, y, z, 0, -0.34, 0.46, 0, -0.52, 0.38, 0.006, 0.004), 0.01)
+  // neck, lost in the dark of the hood
+  return smin(d, capsule(x, y, z, 0, -0.4, -0.1, 0, -1.0, -0.1, 0.24, 0.28), 0.1)
 }
 
 // ---------------------------------------------------------------- The body
-// Authored in model space: y up, face toward +Z, feet dissolve around y = -2.1.
-export const HEAD_PIVOT = [0, 2.2, 0.04]
-export const HEAD_SCALE = 0.84
-const HEAD_OFFSET = [0, 0.96, 0.15] // cranium centre, relative to the neck pivot
-const HEAD_TILT = 0.12 // slight contemplative bow, in radians about X
+// Authored in model space: y up, face toward +Z, the cloak dissolves around y = -3.5.
+export const HEAD_PIVOT = [0, 2.55, 0.1]
+export const HEAD_SCALE = 0.8
+const HEAD_OFFSET = [0, 0.75, 0.12] // mask centre, relative to the neck pivot
+const HEAD_TILT = 0.1 // a slight downward attention, in radians about X
 
-// The robe's silhouette, as a radius around the swept central axis.
-function robeAxis(y) { const t = clamp((1.1 - y) / 3.2, 0, 1); return -0.62 * t * t }
+// The cloak's silhouette, as a radius around a central axis that trails away behind him.
+function robeAxis(y) { const t = clamp((1.4 - y) / 5, 0, 1); return -0.9 * t * t }
 function robeRadius(y) {
-  const flare = smoothstep(0.9, -2.1, y)
-  return mix(0.5, 1.28, Math.pow(flare, 1.35))
+  const flare = smoothstep(1.8, -3.6, y)
+  return mix(0.9, 1.6, Math.pow(flare, 1.2))
 }
 function foldField(theta, y) {
-  const a = smoothstep(1.3, -1.1, y)
-  const wander = 0.5 * Math.sin(y * 1.6 + theta * 3) + 0.8 * vnoise(theta * 1.5 + 9, y * 0.65, 2.3)
+  const a = smoothstep(1.8, -1.8, y)
+  const wander = 0.5 * Math.sin(y * 1.1 + theta * 3) + 0.8 * vnoise(theta * 1.5 + 9, y * 0.45, 2.3)
   const large = Math.sin(theta * 7 + wander * 2.2)
-  const fine = Math.sin(theta * 17 + wander * 3.6 + y * 0.5)
-  return (0.25 + 0.75 * a) * (0.09 * large + 0.03 * fine)
+  const fine = Math.sin(theta * 17 + wander * 3.6 + y * 0.4)
+  return (0.24 + 0.76 * a) * (0.16 * large + 0.04 * fine)
 }
 function robeBody(x, y, z) {
   const zc = z - robeAxis(y)
@@ -122,104 +85,92 @@ function robeBody(x, y, z) {
   const theta = Math.atan2(zc, x)
   const R = robeRadius(y) * (1 - 0.06 * Math.sin(theta)) + foldField(theta, y)
   let d = (r - R) * 0.72
-  const hem = -2.0 + 0.3 * Math.sin(theta * 3 + 1.1) + 0.14 * Math.sin(theta * 8)
+  const hem = -3.55 + 0.36 * Math.sin(theta * 3 + 1.1) + 0.16 * Math.sin(theta * 8)
   d = smax(d, hem - y, 0.12)
+  return smax(d, y - 2.5, 0.2)
+}
+
+const hoodOuter = (x, y, z) => ellipsoid(x, y, z, 0, 3.3, -0.04, 0.8, 1.05, 0.95)
+const hoodCavity = (x, y, z) => ellipsoid(x, y, z, 0, 3.28, 0.62, 0.62, 0.9, 0.95)
+
+function hood(x, y, z) {
+  let d = smin(hoodOuter(x, y, z), capsule(x, y, z, 0, 3.9, -0.28, 0, 4.62, -0.7, 0.36, 0.03), 0.3)
+  const a = Math.atan2(z + 0.04, x)
+  d += 0.012 * Math.sin(a * 6 + y * 3.2) * smoothstep(3.6, 2.7, y)
   return d
 }
 
 function sleeve(x, y, z) {
-  // shoulder -> elbow -> clasped hands, swelling toward the cuff
-  let d = capsule(x, y, z, 0.68, 1.68, -0.06, 0.92, 0.82, 0.08, 0.21, 0.25)
-  d = smin(d, capsule(x, y, z, 0.92, 0.82, 0.08, 0.36, 0.56, 0.62, 0.25, 0.3), 0.14)
+  // shoulder -> elbow -> sleeves meeting at the front, the hands lost inside them
+  let d = capsule(x, y, z, 1.02, 2.25, -0.02, 1.22, 1.12, 0.1, 0.26, 0.3)
+  d = smin(d, capsule(x, y, z, 1.22, 1.12, 0.1, 0.1, 0.84, 0.92, 0.3, 0.34), 0.14)
+  // the sleeve's long hanging drape
+  d = smin(d, ellipsoid(x, y, z, 0.88, 0.14, 0.42, 0.3, 0.92, 0.17), 0.2)
   const s = Math.atan2(z - 0.3, x - 0.7)
-  d += 0.016 * Math.sin(s * 5 + y * 8) * smoothstep(1.5, 0.8, y)
-  // open the cuff
-  const cuff = capsule(x, y, z, 0.42, 0.59, 0.56, 0.12, 0.46, 0.84, 0.22, 0.26)
-  return smax(d, -cuff, 0.03)
+  return d + 0.022 * Math.sin(s * 5 + y * 7) * smoothstep(2, 1, y)
 }
 
 function clothSdf(x0, y, z) {
   const x = Math.abs(x0)
-  // chest, broad shoulders, and a mantle falling from them
-  let d = ellipsoid(x, y, z, 0, 1.22, 0, 0.66, 0.78, 0.45)
-  d = smin(d, ellipsoid(x, y, z, 0.62, 1.74, -0.05, 0.3, 0.24, 0.3), 0.26)
-  d = smin(d, ellipsoid(x, y, z, 0.32, 1.42, 0.26, 0.26, 0.26, 0.17), 0.18)
-  d = smin(d, robeBody(x0, y, z), 0.12)
-  d = smin(d, sleeve(x, y, z), 0.09)
-  // neck opening
-  // a soft cowl rolled around the neck
-  {
-    const rr = Math.sqrt(x * x + (z - 0.02) * (z - 0.02))
-    const roll = Math.sqrt((rr - 0.33) * (rr - 0.33) + (y - 1.97) * (y - 1.97)) - 0.12 - 0.012 * Math.sin(Math.atan2(z, x0) * 6 + y * 5)
-    d = smin(d, roll, 0.1)
-    d = smax(d, -capsule(x, y, z, 0, 2.7, 0.08, 0, 1.82, 0.04, 0.235, 0.235), 0.035)
-  }
-  // cowl: soft swags across the chest
-  const swag = 0.018 * Math.sin((y + x * x * 1.3) * 15) * smoothstep(1.2, 1.5, y) * smoothstep(0.26, 0, z < 0 ? 1 : 0) * smoothstep(0.65, 0.2, x)
-  return d + swag
+  // a narrow body under a broad mantle, falling from a deep hood
+  let d = ellipsoid(x, y, z, 0, 2.35, 0, 1.15, 0.95, 0.72)
+  // heavy pleats falling from the shoulders
+  const drape = Math.atan2(z, x0)
+  d += (0.048 * Math.sin(drape * 9 + y * 1.3) + 0.016 * Math.sin(drape * 23 - y)) * smoothstep(3, 1.9, y)
+  d = smin(d, robeBody(x0, y, z), 0.16)
+  d = smin(d, hood(x, y, z), 0.3)
+  d = smin(d, sleeve(x, y, z), 0.1)
+  return smax(d, -hoodCavity(x, y, z), 0.035)
 }
 
 function trimSdf(x0, y, z) {
   const x = Math.abs(x0)
-  // the signature standing collar: a tall flared crescent behind the head
-  const rr = Math.sqrt(x * x + (z + 0.02) * (z + 0.02))
-  const a = Math.atan2(x, -(z + 0.02)) // 0 at the back, pi at the front
-  const openFront = smoothstep(2.25, 1.75, a)
-  const lean = (y - 1.85) * 0.48
-  const collarR = 0.5 + lean
-  const shell = Math.abs(rr - collarR) - 0.034
-  const top = 1.84 + 1.08 * openFront * (0.32 + 0.68 * Math.pow(Math.max(0, Math.cos(a * 0.72)), 1.3))
-  let d = smax(shell, y - top, 0.02)
-  d = smax(d, 1.82 - y, 0.02)
-  d = smax(d, a - 2.25, 0.03)
-  d = d * 0.7
-  // collar seat
-  const seat = Math.sqrt(Math.pow(rr - 0.55, 2) + Math.pow(y - 1.86, 2)) - 0.042
-  d = smin(d, seat, 0.03)
-  // chest clasp: a pointed drop
-  const clasp = ellipsoid(x, y, z, 0, 1.68, 0.5, 0.105, 0.17, 0.05)
-  d = smin(d, clasp, 0.02)
-  // straps running from the seat to the clasp
-  d = smin(d, capsule(x, y, z, 0.38, 1.87, 0.38, 0.04, 1.68, 0.51, 0.02), 0.01)
+  // gold running around the mouth of the hood
+  let d = smax(Math.abs(hoodOuter(x, y, z)) - 0.036, Math.abs(hoodCavity(x, y, z)) - 0.036, 0.014)
+  const skin = Math.abs(clothSdf(x0, y, z))
+  // two lines falling down the front of the cloak
+  const seam = Math.abs(x - (0.07 + (2.2 - y) * 0.055)) - 0.022
+  d = smin(d, smax(smax(skin - 0.02, seam, 0.006), Math.max(y - 1.7, -2.05 - y), 0.02), 0.01)
+  // a double hem of gold, where the cloak still holds together
+  const theta = Math.atan2(z, x0)
+  const wave = y + 1.7 + 0.1 * Math.sin(theta * 3 + 1.1)
+  d = smin(d, smax(skin - 0.012, Math.abs(wave) - 0.024, 0.006), 0.01)
+  d = smin(d, smax(skin - 0.012, Math.abs(wave + 0.13) - 0.01, 0.005), 0.01)
+  // a lens clasp at the chest
+  const ring = Math.sqrt(Math.pow(len(x, y - 2.02, 0) - 0.17, 2) + Math.pow(z - 1, 2)) - 0.03
+  d = smin(d, ring, 0.01)
+  d = smin(d, ellipsoid(x, y, z, 0, 2.02, 1, 0.1, 0.1, 0.05), 0.01)
   // sleeve cuffs
-  const cuffSurface = Math.abs(capsule(x, y, z, 0.584, 0.664, 0.404, 0.36, 0.56, 0.62, 0.296, 0.304)) - 0.016
-  const slab = Math.abs((x - 0.472) * -0.683 + (y - 0.612) * -0.317 + (z - 0.512) * 0.659) - 0.05
-  return smin(d, smax(cuffSurface, slab, 0.012), 0.01)
-}
-
-function handsSdf(x0, y, z) {
-  const x = Math.abs(x0)
-  // two hands resting together; fingers interlaced by mirroring across x
-  let d = ellipsoid(x, y, z, 0.17, 0.48, 0.78, 0.13, 0.1, 0.16)
-  d = smin(d, capsule(x, y, z, 0.34, 0.52, 0.66, 0.2, 0.49, 0.75, 0.085, 0.09), 0.05)
-  for (let i = 0; i < 4; i++) {
-    const t = i / 3, oz = mix(0.82, 0.92, t), oy = mix(0.525, 0.44, t)
-    const kx = mix(0.065, 0.09, Math.abs(t - 0.4)), r = mix(0.031, 0.026, t)
-    d = smin(d, capsule(x, y, z, 0.13, oy + 0.015, oz - 0.04, kx, oy + 0.03, oz + 0.075, r), 0.012)
-    d = smin(d, capsule(x, y, z, kx, oy + 0.03, oz + 0.075, 0.015, oy - 0.015, oz + 0.075, r * 0.9), 0.01)
-  }
-  // thumb
-  d = smin(d, capsule(x, y, z, 0.17, 0.57, 0.75, 0.055, 0.615, 0.81, 0.038, 0.03), 0.03)
-  return d
+  const cuff = Math.abs(capsule(x, y, z, 1.22, 1.12, 0.1, 0.1, 0.84, 0.92, 0.3, 0.34)) - 0.022
+  const slab = Math.abs((x - 0.42) * -0.791 + (y - 0.92) * -0.198 + (z - 0.69) * 0.579) - 0.05
+  return smin(d, smax(cuff, slab, 0.012), 0.01)
 }
 
 // ---------------------------------------------------------------- Colours (linear RGB)
 const lerp3 = (a, b, t) => [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)]
-const IVORY = [0.56, 0.54, 0.66], VIOLET = [0.2, 0.09, 0.56], INDIGO = [0.05, 0.04, 0.24]
+const NIGHT = [0.022, 0.018, 0.07], VIOLET = [0.1, 0.045, 0.34], LINING = [0.006, 0.003, 0.018]
+const PORCELAIN = [0.74, 0.7, 0.68], GOLD = [1, 0.66, 0.24], SHADOW = [0.02, 0.012, 0.05]
 
 function clothColor(x, y, z) {
-  // ivory mantle sinking into violet, with a deep indigo inner tunic panel
-  let c = lerp3(IVORY, VIOLET, smoothstep(0.7, -1.7, y))
-  const panel = (1 - smoothstep(0.2, 0.27, Math.abs(x) - (1.5 - y) * 0.13)) * smoothstep(-0.2, 0.2, z) * smoothstep(1.56, 1.46, y)
-  c = lerp3(c, INDIGO, panel)
-  return c
+  // night at the shoulders, deepening into violet as the cloak starts to come apart
+  const c = lerp3(NIGHT, VIOLET, smoothstep(0, -3, y))
+  return lerp3(c, LINING, 1 - smoothstep(0, 0.16, hoodCavity(Math.abs(x), y, z) - 0.04))
 }
-const SKIN_A = [0.045, 0.11, 0.4], SKIN_B = [0.1, 0.22, 0.62]
-function skinColor(x, y, z) {
-  // blue skin, flushed paler across the dome and darker in the cheek and lips
-  let c = lerp3(SKIN_A, SKIN_B, smoothstep(-0.45, 0.55, y))
-  const lips = Math.exp(-Math.pow((y + 0.443) / 0.05, 2)) * Math.exp(-x * x / 0.018) * smoothstep(0.4, 0.5, z)
-  return lerp3(c, [0.15, 0.11, 0.38], lips * 0.7)
+
+// Thin gold repairs: one line down the brow, and a fracture running up from the left slit.
+function segment(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay
+  const h = clamp(((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy), 0, 1)
+  return Math.hypot(px - ax - dx * h, py - ay - dy * h)
+}
+function maskColor(x, y, z) {
+  if (z < -0.05 || y < -0.56) return SHADOW
+  const s = Math.min(
+    segment(x, y, 0.005, 0.6, 0.015, 0.2), segment(x, y, 0.015, 0.2, -0.008, -0.1),
+    segment(x, y, 0.2, 0.07, 0.25, 0.27), segment(x, y, 0.25, 0.27, 0.19, 0.42), segment(x, y, 0.19, 0.42, 0.26, 0.6),
+    segment(x, y, 0.25, 0.27, 0.34, 0.33),
+  )
+  return lerp3(PORCELAIN, GOLD, 1 - smoothstep(0.013, 0.019, s))
 }
 
 // ---------------------------------------------------------------- Polygoniser
@@ -365,6 +316,76 @@ function writeGlb(path, parts, nodes, materials) {
   console.log(`${path}: ${(total / 1048576).toFixed(2)} MB`)
 }
 
+// ---------------------------------------------------------------- The astrolabe halo
+// Plain parametric tubes stay perfectly round however close the camera comes.
+function tube(path, r, closed, sides = 10) {
+  const pos = [], nrm = [], idx = []
+  const n = path.length
+  for (let i = 0; i < n; i++) {
+    const p = path[i], a = path[closed ? (i + n - 1) % n : Math.max(i - 1, 0)], b = path[closed ? (i + 1) % n : Math.min(i + 1, n - 1)]
+    let tx = b[0] - a[0], ty = b[1] - a[1], tz = b[2] - a[2]
+    const tl = len(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl
+    // frame: one axis out of the ring plane, the other across it
+    let ux = 0, uy = 0, uz = 1
+    if (Math.abs(tz) > 0.9) { ux = 1; uz = 0 }
+    let vx = ty * uz - tz * uy, vy = tz * ux - tx * uz, vz = tx * uy - ty * ux
+    const vl = len(vx, vy, vz) || 1; vx /= vl; vy /= vl; vz /= vl
+    ux = vy * tz - vz * ty; uy = vz * tx - vx * tz; uz = vx * ty - vy * tx
+    for (let s = 0; s < sides; s++) {
+      const q = (s / sides) * Math.PI * 2, c = Math.cos(q), d = Math.sin(q)
+      const nx = ux * c + vx * d, ny = uy * c + vy * d, nz = uz * c + vz * d
+      pos.push(p[0] + nx * r, p[1] + ny * r, p[2] + nz * r)
+      nrm.push(Math.round(nx * 127), Math.round(ny * 127), Math.round(nz * 127), 127)
+    }
+  }
+  const last = closed ? n : n - 1
+  for (let i = 0; i < last; i++) for (let s = 0; s < sides; s++) {
+    const a = i * sides + s, b = i * sides + (s + 1) % sides
+    const c = ((i + 1) % n) * sides + s, d = ((i + 1) % n) * sides + (s + 1) % sides
+    idx.push(a, c, b, b, c, d)
+  }
+  return { pos, nrm, idx }
+}
+const arc = (R, from, to, steps) => Array.from({ length: steps + 1 }, (_, i) => {
+  const a = mix(from, to, i / steps)
+  return [Math.cos(a) * R, Math.sin(a) * R, 0]
+})
+const ring = (R, steps) => arc(R, 0, Math.PI * 2 * (1 - 1 / steps), steps - 1)
+function merge(list) {
+  const pos = [], nrm = [], idx = []
+  for (const m of list) {
+    const base = pos.length / 3
+    pos.push(...m.pos); nrm.push(...m.nrm)
+    for (const i of m.idx) idx.push(i + base)
+  }
+  const n = pos.length / 3
+  return { pos: new Float32Array(pos), nrm: new Int8Array(nrm), col: new Uint8Array(n * 4).fill(255), idx: new Uint32Array(idx) }
+}
+
+// Outer ring, marked off in degrees like an instrument.
+function haloMain() {
+  const parts = [tube(ring(2.05, 360), 0.03, true), tube(ring(1.94, 360), 0.012, true)]
+  for (let i = 0; i < 72; i++) {
+    const a = (i / 72) * Math.PI * 2, major = i % 6 === 0
+    const r0 = major ? 1.86 : 1.94, c = Math.cos(a), s = Math.sin(a)
+    parts.push(tube([[c * r0, s * r0, 0], [c * 2.05, s * 2.05, 0]], major ? 0.012 : 0.007, false, 6))
+  }
+  return merge(parts)
+}
+// Three broken arcs, each carrying a small bead of light.
+function haloArcs() {
+  const parts = []
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2
+    parts.push(tube(arc(1.6, a, a + 1.5, 90), 0.02, false))
+    const c = Math.cos(a + 1.5) * 1.6, s = Math.sin(a + 1.5) * 1.6
+    const bead = eyeball(0.065)
+    parts.push({ pos: [...bead.pos].map((v, j) => v + (j % 3 === 0 ? c : j % 3 === 1 ? s : 0)), nrm: [...bead.nrm], idx: [...bead.idx] })
+  }
+  return merge(parts)
+}
+const haloOrbit = () => merge([tube(ring(2.45, 360), 0.018, true)])
+
 // ---------------------------------------------------------------- Assembly
 const s = HEAD_SCALE
 const cosT = Math.cos(HEAD_TILT), sinT = Math.sin(HEAD_TILT)
@@ -376,7 +397,7 @@ function headInPivot(x, y, z) {
 }
 function headColorPivot(x, y, z) {
   const qy = y - HEAD_OFFSET[1], qz = z - HEAD_OFFSET[2]
-  return skinColor((x - HEAD_OFFSET[0]) / s, (qy * cosT + qz * sinT) / s, (-qy * sinT + qz * cosT) / s)
+  return maskColor((x - HEAD_OFFSET[0]) / s, (qy * cosT + qz * sinT) / s, (-qy * sinT + qz * cosT) / s)
 }
 const eyeInPivot = (sign) => {
   const ex = EYE.x * s * sign, ey0 = EYE.y * s, ez0 = EYE.z * s
@@ -385,30 +406,36 @@ const eyeInPivot = (sign) => {
 
 const quick = process.argv.includes('--quick')
 const q = quick ? 2 : 1
-const head = polygonize('head', headInPivot, [-0.66, -0.46, -0.72], [0.66, 1.62, 0.86], 0.0105 * q, headColorPivot, 0.09)
-const cloth = polygonize('cloth', clothSdf, [-1.7, -2.45, -2.2], [1.7, 2.4, 1.4], 0.027 * q, clothColor, 0.34)
-const trim = polygonize('trim', trimSdf, [-1.12, 0.3, -1.1], [1.12, 3.4, 1.05], 0.019 * q, () => [1, 1, 1], 0.08)
-const hands = polygonize('hands', handsSdf, [-0.52, 0.32, 0.5], [0.52, 0.76, 1.08], 0.0105 * q, (x, y, z) => skinColor(x, 0, 0), 0.05)
+const head = polygonize('mask', headInPivot, [-0.5, -0.12, -0.42], [0.5, 1.42, 0.74], 0.0105 * q, headColorPivot, 0.09)
+const cloth = polygonize('cloth', clothSdf, [-2.2, -4.15, -3], [2.2, 5, 1.75], 0.03 * q, clothColor, 0.42)
+const trim = polygonize('trim', trimSdf, [-1.8, -3.1, -1.5], [1.8, 4.4, 1.6], 0.02 * q, () => [1, 1, 1], 0.08)
 const eye = eyeball(EYE.r * s)
 
 const materials = [
-  { name: 'Skin', pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1], metallicFactor: 0, roughnessFactor: 0.46 } },
-  { name: 'Cloth', doubleSided: true, pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1], metallicFactor: 0, roughnessFactor: 0.68 } },
+  { name: 'Mask', pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1], metallicFactor: 0, roughnessFactor: 0.34 } },
+  { name: 'Cloth', doubleSided: true, pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1], metallicFactor: 0, roughnessFactor: 0.7 } },
   { name: 'Gold', doubleSided: true, pbrMetallicRoughness: { baseColorFactor: [0.98, 0.72, 0.36, 1], metallicFactor: 1, roughnessFactor: 0.3 } },
   { name: 'Eye', pbrMetallicRoughness: { baseColorFactor: [1, 1, 1, 1], metallicFactor: 0, roughnessFactor: 0.2 } },
 ]
 const parts = [
   { name: 'Robe', mesh: cloth, material: 1 }, { name: 'Trim', mesh: trim, material: 2 },
-  { name: 'Hands', mesh: hands, material: 0 }, { name: 'HeadSkin', mesh: head, material: 0 },
+  { name: 'Mask', mesh: head, material: 0 },
   { name: 'EyeBall', mesh: eye, material: 3 },
+  { name: 'HaloMain', mesh: haloMain(), material: 2 }, { name: 'HaloArcs', mesh: haloArcs(), material: 2 },
+  { name: 'HaloOrbit', mesh: haloOrbit(), material: 2 },
 ]
+// Halo nodes spin about their own local Z at run time; replacement models can leave them out.
+const tiltX = (a) => [Math.sin(a / 2), 0, 0, Math.cos(a / 2)]
 const nodes = [
-  { name: 'Watcher', children: [1, 2, 3, 4] },
-  { name: 'Robe', mesh: 0 }, { name: 'Trim', mesh: 1 }, { name: 'Hands', mesh: 2 },
-  { name: 'Head', translation: HEAD_PIVOT, children: [5, 6, 7] },
-  { name: 'HeadSkin', mesh: 3 },
-  { name: 'Eye_L', mesh: 4, translation: eyeInPivot(1) },
-  { name: 'Eye_R', mesh: 4, translation: eyeInPivot(-1) },
+  { name: 'Watcher', children: [1, 2, 3, 7, 8, 9] },
+  { name: 'Robe', mesh: 0 }, { name: 'Trim', mesh: 1 },
+  { name: 'Head', translation: HEAD_PIVOT, children: [4, 5, 6] },
+  { name: 'Mask', mesh: 2 },
+  { name: 'Eye_L', mesh: 3, translation: eyeInPivot(1) },
+  { name: 'Eye_R', mesh: 3, translation: eyeInPivot(-1) },
+  { name: 'Halo_A', mesh: 4, translation: [0, 3.35, -0.95] },
+  { name: 'Halo_B', mesh: 5, translation: [0, 3.35, -0.85] },
+  { name: 'Halo_C', mesh: 6, translation: [0, 3.35, -1.7], rotation: tiltX(0.5) },
 ]
 mkdirSync('public/assets/characters', { recursive: true })
 writeGlb('public/assets/characters/watcher.glb', parts, nodes, materials)
