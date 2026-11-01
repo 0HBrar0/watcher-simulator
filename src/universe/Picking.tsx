@@ -76,14 +76,14 @@ export function Picking() {
     const onMove = (e: PointerEvent) => {
       if (down.current) return
       const r = rect()
-      if (!(e.target instanceof HTMLCanvasElement)) { useApp.getState().hover(null); return }
+      if (e.target !== dom) { useApp.getState().hover(null); return }
       const id = pick(e.clientX - r.left, e.clientY - r.top, r.width, r.height, camera)
       useApp.getState().hover(id)
       dom.style.cursor = id ? 'pointer' : 'grab'
     }
     const onDown = (e: PointerEvent) => {
-      if (e.button === 0 && e.target instanceof HTMLCanvasElement) down.current = { x: e.clientX, y: e.clientY, time: performance.now() }
-      if (e.target instanceof HTMLCanvasElement) dom.style.cursor = 'grabbing'
+      if (e.button === 0 && e.target === dom) down.current = { x: e.clientX, y: e.clientY, time: performance.now() }
+      if (e.target === dom) dom.style.cursor = 'grabbing'
     }
     const onUp = (e: PointerEvent) => {
       const d = down.current

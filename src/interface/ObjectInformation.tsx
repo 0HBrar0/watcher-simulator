@@ -4,6 +4,7 @@ import { getTarget } from '../planets/PlanetRegistry'
 import { useApp, WATCHER_ID } from '../state/store'
 import { setObservationTarget } from '../watcher/ObservationSystem'
 import { watcherState } from '../watcher/WatcherState'
+import { cameraCommands } from '../camera/cameraInput'
 
 function describe(id: string) {
   if (id === WATCHER_ID) return { name: WATCHER.name, category: 'Observer', description: WATCHER.description, context: undefined as string | undefined }
@@ -40,6 +41,8 @@ export function ObjectInformation() {
   const mode = useApp((s) => s.mode)
   const relation = useWatcherRelation(selectedId)
   const notify = useApp((s) => s.notify)
+  const earthReady = useApp((s) => s.earthReady)
+  const travelling = useApp((s) => s.travelling)
 
   if (!selectedId || (mode === 'watcher' && selectedId === WATCHER_ID)) return null
   const info = describe(selectedId)
@@ -63,6 +66,9 @@ export function ObjectInformation() {
       {relation && <p className="info__relation">{relation}</p>}
       {isWatcher && <p className="info__relation">Observing {getTarget(observed)?.name}.</p>}
       <div className="info__actions">
+        {selectedId === 'earth' && focusId === 'earth' && earthReady && !travelling && (
+          <button className="primary" onClick={() => cameraCommands.goToSurface()}>Go down to Earth</button>
+        )}
         {isWatcher && mode !== 'watcher' && (
           <button className="primary" onClick={() => requestCamera({ kind: 'watcherPov' })}>See through his eyes</button>
         )}

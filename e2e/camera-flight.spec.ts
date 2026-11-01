@@ -3,6 +3,8 @@ import { expect, test } from '@playwright/test'
 test('dragging during a flight does not stop it', async ({ page, isMobile }) => {
   test.skip(isMobile, 'mouse flow')
   await page.goto('./')
+  await page.locator('.ready').waitFor({ state: 'attached', timeout: 50_000 })
+  await page.locator('#loader').waitFor({ state: 'detached' })
   await page.getByRole('button', { name: 'Skip intro' }).dispatchEvent('click')
   const eyes = page.getByRole('button', { name: 'His eyes' })
   await eyes.click()

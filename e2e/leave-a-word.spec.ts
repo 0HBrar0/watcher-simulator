@@ -21,6 +21,7 @@ const send = (page: Page) => page.getByRole('button', { name: 'Leave it' })
 
 test.beforeEach(async ({ page }) => {
   await page.goto('./')
+  await expect(page.locator('#loader')).toHaveCount(0, { timeout: 170000 })
   await expect(opener(page)).toHaveCount(1)
 })
 

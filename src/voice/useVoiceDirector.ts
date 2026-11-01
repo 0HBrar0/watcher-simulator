@@ -38,12 +38,19 @@ export function useVoiceDirector() {
       return true
     }
 
-    const opening = setTimeout(() => {
-      if (speak(OPENING, RANK.opening)) nextMusing = now() + OPENING.seconds + FIRST_MUSING
-    }, OPENING_DELAY * 1000)
+    // He speaks once the door opens, not while the loading screen is up.
+    let opening = 0
+    const greet = () => {
+      opening = window.setTimeout(() => {
+        if (speak(OPENING, RANK.opening)) nextMusing = now() + OPENING.seconds + FIRST_MUSING
+      }, OPENING_DELAY * 1000)
+    }
+    if (useApp.getState().loaded) greet()
 
     let approachTimer = 0
     const stop = useApp.subscribe((state, previous) => {
+      if (state.loaded && !previous.loaded) greet()
+
       // Selecting him is also the first step into his eyes, so let the camera declare itself first.
       if (state.selectedId === WATCHER_ID && previous.selectedId !== WATCHER_ID) {
         clearTimeout(approachTimer)
@@ -68,7 +75,7 @@ export function useVoiceDirector() {
     const musing = setInterval(() => {
       const app = useApp.getState()
       // Never start a thought on the way somewhere: he will have something to say on arrival.
-      if (app.intro || app.travelling || app.voiceBlocked || document.hidden || isSpeaking()) return
+      if (!app.loaded || app.intro || app.travelling || app.voiceBlocked || document.hidden || isSpeaking()) return
       if (now() < nextMusing || now() - lastInput < INPUT_QUIET) return
       if (musings.length === 0) musings = shuffled(MUSINGS)
       const line = musings.pop()!

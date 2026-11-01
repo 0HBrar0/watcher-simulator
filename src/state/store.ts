@@ -19,6 +19,7 @@ interface AppState {
   hoveredId: string | null
   travelling: boolean
   intro: boolean
+  loaded: boolean // everything is on the GPU and running steadily
   atlasOpen: boolean
   settingsOpen: boolean
   keysOpen: boolean
@@ -29,6 +30,10 @@ interface AppState {
   toast: { text: string; seconds: number; nonce: number } | null
   speech: { line: VoiceLine; nonce: number } | null
   voiceBlocked: boolean // the browser is holding back sound until a click or key press
+  earthPhase: 'off' | 'entering' | 'on' // the real Earth map over the universe
+  earthReady: boolean // its map has loaded, so the camera may hand over
+  earthBlocked: boolean // its free services did not answer; stay on the universe's Earth
+  universeResting: boolean // the map covers the screen, so the universe need not draw
   observationTarget: string // mirrored from the Watcher's own state for the UI
   request: (CameraRequest & { nonce: number }) | null
 
@@ -41,6 +46,8 @@ interface AppState {
   setShowGaze: (show: boolean) => void
   setPrefs: (partial: Partial<Prefs>) => void
   setVoice: (partial: Partial<Pick<AppState, 'speech' | 'voiceBlocked'>>) => void
+  setEarth: (partial: Partial<Pick<AppState, 'earthPhase' | 'earthReady' | 'earthBlocked' | 'universeResting'>>) => void
+  setLoaded: () => void
   notify: (text: string, seconds?: number) => void
   setObservationMirror: (id: string) => void
 }
@@ -54,6 +61,7 @@ export const useApp = create<AppState>((set) => ({
   hoveredId: null,
   travelling: false,
   intro: true,
+  loaded: false,
   atlasOpen: false,
   settingsOpen: false,
   keysOpen: false,
@@ -64,6 +72,10 @@ export const useApp = create<AppState>((set) => ({
   toast: null,
   speech: null,
   voiceBlocked: false,
+  earthPhase: 'off',
+  earthReady: false,
+  earthBlocked: false,
+  universeResting: false,
   observationTarget: '',
   request: null,
 
@@ -80,6 +92,8 @@ export const useApp = create<AppState>((set) => ({
     return { prefs }
   }),
   setVoice: (partial) => set(partial),
+  setEarth: (partial) => set(partial),
+  setLoaded: () => set({ loaded: true }),
   notify: (text, seconds = 2.6) => set({ toast: { text, seconds, nonce: ++nonce } }),
   setObservationMirror: (observationTarget) => set({ observationTarget }),
 }))

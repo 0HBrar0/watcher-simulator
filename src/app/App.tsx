@@ -4,6 +4,8 @@ import { PerformanceMonitor } from '@react-three/drei'
 import { NoToneMapping, PCFShadowMap } from 'three'
 import { UniverseScene } from '../universe/UniverseScene'
 import { Interface } from '../interface/HUD'
+import { RealEarth } from '../earth/RealEarth'
+import { removeLoader } from './loader'
 import { useApp } from '../state/store'
 import { QUALITY } from '../state/quality'
 
@@ -15,8 +17,10 @@ export function App() {
   const level = useApp((s) => s.quality)
   const profile = QUALITY[level]
   const [dprScale, setDprScale] = useState(1)
+  const resting = useApp((s) => s.universeResting)
 
   if (!hasWebGL2()) {
+    removeLoader()
     return (
       <main className="unsupported">
         <h1>The sky is closed</h1>
@@ -34,7 +38,7 @@ export function App() {
         gl={{ antialias: false, powerPreference: 'high-performance', stencil: false, alpha: false, toneMapping: NoToneMapping }}
         shadows={{ type: PCFShadowMap }}
         camera={{ fov: 38, near: 1, far: 40000, position: [0, 0, 1000] }}
-        frameloop="always"
+        frameloop={resting ? 'never' : 'always'}
       >
         <PerformanceMonitor
           bounds={() => [45, 75]}
@@ -44,6 +48,7 @@ export function App() {
         />
         <UniverseScene />
       </Canvas>
+      <RealEarth />
       <Interface />
     </>
   )

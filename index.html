@@ -7,8 +7,38 @@
     <meta name="description" content="An unofficial fan-made 3D universe. Explore the cosmos and see it through the eyes of The Watcher." />
     <title>The Watcher: Cosmic Observatory</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='15' fill='%23160b38'/><ellipse cx='16' cy='16' rx='11' ry='6' fill='none' stroke='%23d9c8ff' stroke-width='1.5'/><circle cx='16' cy='16' r='3.4' fill='%23f2c879'/></svg>" />
+    <link rel="preload" as="image" href="assets/characters/silhouette.webp" />
+    <style>
+      body { margin: 0; background: #120a2e; }
+      #loader {
+        --left: 578;
+        position: fixed; inset: 0; z-index: 5;
+        display: grid; place-content: center; justify-items: center; gap: 22px;
+        background: radial-gradient(ellipse at 50% 42%, #2a1561 0%, #170b3c 46%, #0c0524 100%);
+        color: #f2ecff;
+        transition: opacity 1.1s ease;
+      }
+      #loader.loader--done { opacity: 0; pointer-events: none; }
+      #loader svg { height: min(58vh, 460px); width: auto; overflow: visible; }
+      #loader .halo { fill: none; stroke: rgba(226, 214, 255, 0.16); stroke-width: 2; }
+      #loader .arc { fill: none; stroke: #f2c879; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 578; stroke-dashoffset: var(--left); transform: rotate(-90deg); transform-origin: 231px 203px; transition: stroke-dashoffset 0.5s ease; filter: drop-shadow(0 0 6px rgba(242, 200, 121, 0.7)); }
+      #loader .figure { filter: drop-shadow(0 0 1.5px rgba(214, 196, 255, 0.75)) drop-shadow(0 0 26px rgba(138, 96, 255, 0.5)); }
+      #loader .eyes { fill: #f2c879; filter: drop-shadow(0 0 6px #f2c879); animation: watching 3.2s ease-in-out infinite; }
+      #loader p { margin: 0; font: italic 300 clamp(20px, 2.4vw, 28px) 'Cormorant Garamond', 'Iowan Old Style', Georgia, serif; color: rgba(233, 224, 255, 0.78); }
+      @keyframes watching { 50% { opacity: 0.45; } }
+      @media (prefers-reduced-motion: reduce) { #loader .eyes { animation: none; } }
+    </style>
   </head>
   <body>
+    <div id="loader" role="status" aria-label="Loading the universe">
+      <svg viewBox="0 0 463 900" aria-hidden="true">
+        <circle class="halo" cx="231" cy="203" r="226" />
+        <circle class="arc" cx="231" cy="203" r="226" pathLength="578" />
+        <image class="figure" href="assets/characters/silhouette.webp" width="463" height="900" />
+        <g class="eyes"><ellipse cx="208" cy="196" rx="10" ry="3.6" /><ellipse cx="254" cy="196" rx="10" ry="3.6" /></g>
+      </svg>
+      <p>He has been expecting you.</p>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

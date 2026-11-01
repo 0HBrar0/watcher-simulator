@@ -43,9 +43,10 @@ npm run test:e2e  # end-to-end tests on desktop and phone (first: npx playwright
 | H | Hide the interface |
 | F | Fullscreen |
 | Click a world | Fly to it |
+| Scroll into Earth, or **Go down to Earth** | Enter the real planet |
 | Click the Watcher | Choose: approach, or see through his eyes |
 | Scroll or fly mid-flight | Take the camera back (clicks and drags do not) |
-| Esc | Close what is open, then return to the overview |
+| Esc | Close what is open, leave the real Earth, then return to the overview |
 
 The zoom rail appears on the right when you zoom and fades by itself. Rest the pointer on the right
 edge to bring it back and drag it. Drag and zoom speed are in Settings, and are remembered. Add
@@ -57,6 +58,23 @@ changes what the Watcher is observing; use **Turn his gaze here** on a world to 
 He speaks: an opening line, reactions when you approach him, look through his eyes or reach Earth,
 Titan or Vormir, and quiet thoughts while you explore. Volume, his voice and subtitles are in
 Settings. The lines and their timings are in `src/voice/lines.ts`.
+
+## The real Earth
+
+Keep zooming into Earth and the planet hands over to real satellite imagery, with country, then
+state, then city names, and streets and buildings up close. Scroll back out, press Esc or use
+**Back to space** to return, directly above where you were.
+
+It is free to run, and needs no key or account. [MapLibre GL JS](https://maplibre.org) draws the globe,
+[EOxCloudless](https://s2maps.eu) supplies Sentinel-2 imagery, and [OpenFreeMap](https://openfreemap.org)
+supplies names, roads and buildings from OpenStreetMap. MapLibre loads only when Earth is in view. If a
+service does not answer, you stay on the normal Earth with a quiet message.
+
+The imagery is a cloud-free mosaic of 2025, not live, and stops at about 10 m a pixel, so you see
+cities, airports and major roads but not houses. Past that the drawn street map takes over.
+
+**The site must stay non-commercial while it uses this imagery.** EOxCloudless 2025 is
+CC BY-NC-SA 4.0, so anything that earns money needs a different source.
 
 ## Leave a word
 
@@ -102,6 +120,8 @@ licensed and credited in `docs/ASSET_CREDITS.md`, and never add extracted film o
 
 - Browsers hold back sound until the first click or key press, so a first-time visitor may need one
   click to hear the opening. The title says so when that happens.
+- The site waits behind its loading screen until models, textures and shaders are ready. That takes
+  longer on a first visit, and gives up waiting after about half a minute on very slow machines.
 - Needs WebGL 2. Designed for desktop browsers; touch input is not tuned, and there is no pinch zoom.
 - Changing the graphics level rebuilds the renderer and returns you to the overview.
 - Measured on an Intel UHD integrated GPU only. Before the remaster, at 1280x720: about 32 fps on

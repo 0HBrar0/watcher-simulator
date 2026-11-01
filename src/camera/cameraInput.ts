@@ -1,3 +1,6 @@
+import type { Vector3 } from 'three'
+import type { EarthView } from '../earth/earthGeometry'
+
 /**
  * The bridge between the camera loop and the interface. The camera writes `readout` every frame
  * and the interface reads it without a React render; `cameraCommands` goes the other way.
@@ -13,4 +16,12 @@ export const readout = {
 export const cameraCommands = {
   zoomTo: (_t: number) => {},
   zoomStep: (_direction: number) => {},
+  goToSurface: () => {},
+  placeOverEarth: (_direction: Vector3, _radii: number) => {},
+}
+
+/** Filled in by RealEarth while Earth is in focus. */
+export const earthCommands = {
+  enter: (_view: EarthView) => {},
+  leave: () => {},
 }

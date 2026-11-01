@@ -25,6 +25,23 @@ observer and planetary perspective are both `orbit`, differing in pivot and limi
 cubic Beziers that bend around bodies (`cameraPath.ts`). A scroll or a movement key cancels them; clicks and drags do not. Arrival points
 are computed relative to the sun, so you always arrive at the lit side of a world.
 
+## Loading
+
+`index.html` paints the silhouette before any script runs. `universe/UniverseScene.tsx` holds it up
+until assets are in, `app/loader.ts` has compiled the shaders and uploaded the textures, and the
+frame rate has settled. Input and the opening flight wait for `loaded` in the store.
+
+## The real Earth
+
+`earth/RealEarth.tsx` is a MapLibre globe in its own layer over the universe. It is created once
+Earth has focus, from a chunk that nothing else imports (`earth/earthMap.ts`). Inside about two Earth
+radii, `CameraManager` hands over through `earthCommands.enter`, passing the view from
+`earth/earthGeometry.ts`, which converts between the planet's frame and latitude, longitude and zoom.
+Field of view and apparent size match, so the two Earths line up. The map fades in, and the universe
+stops rendering once the map covers the screen. Zooming out past the exit distance, Esc or any
+camera request reverses it. Repeated tile failures, or no answer within 30 seconds, set
+`earthBlocked`, and the normal Earth carries on. `earth/earthStyle.ts` is the map's look.
+
 ## Voice
 
 `voice/lines.ts` holds what he says, with beats measured from the audio. `voice/voice.ts` is the

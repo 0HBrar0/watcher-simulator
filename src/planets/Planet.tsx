@@ -12,6 +12,7 @@ import { PlanetRings } from './PlanetRings'
 import { bakeSurface, type BakedSurface } from './proceduralBake'
 import { useApp } from '../state/store'
 import { QUALITY } from '../state/quality'
+import { earthFrame } from '../earth/earthGeometry'
 
 const assetUrl = (path: string) => import.meta.env.BASE_URL + path
 
@@ -165,6 +166,7 @@ function Body({ body, maps, geometry }: BodyProps) {
     spinAngle.current += body.spin * delta
     scratchQuat.setFromAxisAngle(axis, spinAngle.current)
     spinner.current?.quaternion.copy(scratchQuat)
+    if (body.id === 'earth') earthFrame.copy(tilt).multiply(scratchQuat)
     if (cloudMesh.current) {
       const turn = t * 0.0016
       cloudMesh.current.rotation.y = spinAngle.current + turn

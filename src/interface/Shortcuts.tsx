@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { allTargets } from '../planets/PlanetRegistry'
 import { setObservationTarget } from '../watcher/ObservationSystem'
 import { useApp, WATCHER_ID } from '../state/store'
+import { earthCommands } from '../camera/cameraInput'
 
 const TOUR = allTargets.map((t) => t.id)
 
@@ -43,6 +44,7 @@ function escape() {
   const { atlasOpen, settingsOpen, keysOpen, interfaceHidden, selectedId, select, setPanel, requestCamera } = useApp.getState()
   if (interfaceHidden) setPanel({ interfaceHidden: false })
   else if (atlasOpen || settingsOpen || keysOpen) setPanel({ atlasOpen: false, settingsOpen: false, keysOpen: false })
+  else if (useApp.getState().earthPhase === 'on') earthCommands.leave()
   else if (selectedId) select(null)
   else requestCamera({ kind: 'overview' })
 }
@@ -50,7 +52,7 @@ function escape() {
 export function useShortcuts() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || !useApp.getState().loaded) return
       if (e.key === 'Escape') { escape(); return }
       if (e.target instanceof HTMLInputElement) return
       const app = useApp.getState()

@@ -7,7 +7,8 @@ import { useApp, WATCHER_ID } from '../state/store'
 import { watcherState } from '../watcher/WatcherState'
 import { observationPoint } from '../watcher/ObservationSystem'
 import { buildPath, easeInOut, easeOut, samplePath, type FlightPath } from './cameraPath'
-import { cameraCommands, readout } from './cameraInput'
+import { cameraCommands, earthCommands, readout } from './cameraInput'
+import { ENTER_RADII, earthFrame, viewFrom } from '../earth/earthGeometry'
 
 type Rig = 'orbit' | 'travel' | 'pov'
 
@@ -71,6 +72,8 @@ export function CameraManager() {
     keys: new Set<string>(),
     lastInput: -100,
     dragging: 0, // 0 none, 1 orbit, 2 pan
+    descending: false, // on the way to the handover to the real Earth
+    surfaceWanted: false, // asked for the handover, kept until the camera has landed
     px: 0, py: 0,
   }).current
 
@@ -135,11 +138,19 @@ export function CameraManager() {
   }
 
   const applyZoom = (factor: number) => {
+    const app = useApp.getState()
+    if (app.earthPhase !== 'off') return
     readout.touched = performance.now() / 1000
     if (s.rig === 'pov') {
       s.povGoalFov = MathUtils.clamp(s.povGoalFov * factor, POV_FOV_MIN, POV_FOV_MAX)
     } else if (s.rig === 'orbit') {
       const next = s.goalDist * factor
+      if (s.followId === 'earth' && !app.earthBlocked) {
+        // Further in than this the real Earth takes over, so wait here until it is ready.
+        const edge = ENTER_RADII * getTarget('earth')!.radius
+        s.descending = next < edge
+        if (s.descending) { s.goalDist = edge; return }
+      }
       if (!s.followId && next < s.minDist) {
         // In open space there is nothing to stop at, so zooming in becomes flying forward.
         camera.getWorldDirection(v2)
@@ -204,6 +215,13 @@ export function CameraManager() {
       else if (s.rig === 'orbit') s.goalDist = s.maxDist * (s.minDist / s.maxDist) ** t
     }
     cameraCommands.zoomStep = (direction) => applyZoom(Math.exp(-direction * 0.22))
+    cameraCommands.goToSurface = () => { s.surfaceWanted = true }
+    cameraCommands.placeOverEarth = (direction, radii) => {
+      s.yaw = s.goalYaw = Math.atan2(direction.x, direction.z)
+      s.pitch = s.goalPitch = MathUtils.clamp(Math.asin(direction.y), -1.45, 1.45)
+      s.dist = s.goalDist = radii * getTarget('earth')!.radius
+      s.lastInput = performance.now() / 1000
+    }
 
     const onDown = (e: PointerEvent) => {
       if (!(e.target instanceof HTMLCanvasElement)) return
@@ -253,6 +271,7 @@ export function CameraManager() {
     const onContextMenu = (e: Event) => e.preventDefault()
     const onKey = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.ctrlKey || e.metaKey) return
+      if (!useApp.getState().loaded || useApp.getState().earthPhase !== 'off') return // the map has the keyboard
       const key = normalKey(e.key)
       if (key === 'alt') { e.preventDefault(); readout.fine = true; s.keys.add(key) }
       if (key === 'shift') s.keys.add(key)
@@ -359,8 +378,14 @@ export function CameraManager() {
     const { prefs } = useApp.getState()
     const pace = (s.keys.has('alt') ? FINE : 1) * (s.keys.has('shift') ? 3 : 1)
 
+    if (s.surfaceWanted && s.rig === 'orbit') {
+      s.surfaceWanted = false
+      if (s.followId === 'earth') applyZoom(0.1)
+    }
+
     if (s.rig === 'travel') {
-      s.t = Math.min(1, s.t + delta / s.duration)
+      // The opening waits behind the loading screen.
+      if (!s.isIntro || useApp.getState().loaded) s.t = Math.min(1, s.t + delta / s.duration)
       const p = s.isIntro ? easeOut(s.t) : easeInOut(s.t)
 
       // A moving destination (the Watcher, an orbiting moon) stays reachable.
@@ -438,6 +463,14 @@ export function CameraManager() {
       s.pitch += (s.goalPitch - s.pitch) * ease
       // Distance eases on a log scale, so a zoom feels the same near and far.
       s.dist = Math.exp(MathUtils.lerp(Math.log(s.dist), Math.log(s.goalDist), ease))
+
+      // The map is drawn from where the camera really is, so it waits for the camera to arrive.
+      if (s.descending && s.followId === 'earth' && s.dist < s.goalDist * 1.01 && useApp.getState().earthReady) {
+        s.descending = false
+        v1.copy(camera.position).sub(s.pivot).normalize()
+        v2.set(0, 1, 0).applyQuaternion(camera.quaternion)
+        earthCommands.enter(viewFrom(v1, v2, s.dist / getTarget('earth')!.radius, earthFrame))
+      }
 
       // An idle camera keeps a slow, contemplative drift.
       if (prefs.idleDrift && now - s.lastInput > 6 && !s.dragging) {

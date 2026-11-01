@@ -11,6 +11,7 @@ import { Subtitles } from './Subtitles'
 import { LeaveAWord } from './LeaveAWord'
 import { useVoiceDirector } from '../voice/useVoiceDirector'
 import { getTarget } from '../planets/PlanetRegistry'
+import { earthCommands } from '../camera/cameraInput'
 
 function Title() {
   const intro = useApp((s) => s.intro)
@@ -99,13 +100,14 @@ export function Interface() {
   const intro = useApp((s) => s.intro)
   const keysOpen = useApp((s) => s.keysOpen)
   const hidden = useApp((s) => s.interfaceHidden)
+  const onEarth = useApp((s) => s.earthPhase === 'on')
   const away = mode !== 'observer' || !!focusId
   useShortcuts()
   useFirstHint()
   useVoiceDirector()
 
   return (
-    <div className={`hud ${intro ? 'hud--intro' : ''} ${hidden ? 'hud--hidden' : ''}`}>
+    <div className={`hud ${intro ? 'hud--intro' : ''} ${hidden ? 'hud--hidden' : ''} ${onEarth ? 'hud--earth' : ''}`}>
       <div className="label" ref={(el) => { trackers.label = el }} />
       <Title />
       <PovCaption />
@@ -120,6 +122,7 @@ export function Interface() {
         </button>
         <button className="quiet" onClick={() => setPanel({ atlasOpen: !atlasOpen, settingsOpen: false, keysOpen: false })} aria-expanded={atlasOpen}>Atlas</button>
         {away && <button className="quiet" onClick={() => requestCamera({ kind: 'overview' })}>Overview</button>}
+        {onEarth && <button className="quiet back-to-space" onClick={() => earthCommands.leave()}>Back to space</button>}
       </nav>
 
       <nav className="corner corner--right">

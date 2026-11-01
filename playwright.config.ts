@@ -5,7 +5,7 @@ const SITE = `http://127.0.0.1:${PORT}`
 
 export default defineConfig({
   testDir: 'e2e',
-  timeout: 60_000,
+  timeout: 180_000,
   workers: 1, // each page runs the whole universe on a software GPU
   use: {
     baseURL: SITE,
