@@ -1,0 +1,12 @@
+{
+  "name": "watcher-uplink",
+  "private": true,
+  "version": "1.0.0",
+  "license": "MIT",
+  "type": "module",
+  "description": "The one small service behind Leave a word on The Watcher. No dependencies, no database.",
+  "engines": { "node": "22.x" },
+  "scripts": {
+    "start": "node --experimental-strip-types --disable-warning=ExperimentalWarning server.ts"
+  }
+}

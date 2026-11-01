@@ -8,6 +8,7 @@ import { GraphicsSettings } from './GraphicsSettings'
 import { ZoomRail } from './ZoomRail'
 import { KeySheet, toggleFullscreen, useShortcuts } from './Shortcuts'
 import { Subtitles } from './Subtitles'
+import { LeaveAWord } from './LeaveAWord'
 import { useVoiceDirector } from '../voice/useVoiceDirector'
 import { getTarget } from '../planets/PlanetRegistry'
 
@@ -122,6 +123,7 @@ export function Interface() {
       </nav>
 
       <nav className="corner corner--right">
+        <LeaveAWord />
         <button className="quiet" onClick={() => setPanel({ settingsOpen: !settingsOpen, atlasOpen: false, keysOpen: false })} aria-expanded={settingsOpen}>Settings</button>
         <button className="quiet" onClick={() => setPanel({ keysOpen: !keysOpen, atlasOpen: false, settingsOpen: false })} aria-expanded={keysOpen}>Keys</button>
         <Fullscreen />

@@ -1,7 +1,7 @@
 # The Watcher: Cosmic Observatory
 
 An immersive 3D universe you can explore in the browser, and then see through the eyes of the
-being who has been watching it all along. Static site, no backend, no paid services.
+being who has been watching it all along. A static site, plus one tiny service for visitor notes.
 
 > This is an unofficial, non-commercial fan project. Marvel, The Watcher, Uatu and related
 > intellectual property belong to their respective rights holders. This project is not affiliated
@@ -19,6 +19,8 @@ Then open the printed local address. Node 22 or newer is recommended.
 ```bash
 npm run build     # type-checks, then writes the static site to dist/
 npm run preview   # serves dist/ locally
+npm test          # backend and component tests
+npm run test:e2e  # end-to-end tests on desktop and phone (first: npx playwright install chromium)
 ```
 
 ## Using it
@@ -55,6 +57,28 @@ changes what the Watcher is observing; use **Turn his gaze here** on a world to 
 He speaks: an opening line, reactions when you approach him, look through his eyes or reach Earth,
 Titan or Vormir, and quiet thoughts while you explore. Volume, his voice and subtitles are in
 Settings. The lines and their timings are in `src/voice/lines.ts`.
+
+## Leave a word
+
+**Leave a word**, in the top right, lets a visitor send the creator up to 500 characters and an
+optional contact. A blank note is allowed. It arrives on the creator's phone through ntfy.
+
+The browser never talks to ntfy, because that would expose the topic. It posts to
+`uplink-service/`, a separate dependency-free Node service on Railway that checks every field, limits
+the body to 4 KB, allows only listed origins, and holds each visitor to one a minute and five a day,
+and everyone to one every ten seconds and thirty a day. Its logs never contain the topic or a message.
+
+| Railway variable | Value |
+| --- | --- |
+| `NTFY_BASE_URL` | `https://ntfy.sh` |
+| `NTFY_TOPIC` | Secret, set only in Railway |
+| `ALLOWED_ORIGINS` | `https://0hbrar0.github.io` (origins, comma separated) |
+| `TURNSTILE_SECRET_KEY` | Optional, set only in Railway |
+| `NTFY_TOKEN` | Optional, for a protected topic |
+
+Only public values go in `.env.production`: `VITE_UPLINK_URL` and `VITE_TURNSTILE_SITE_KEY`. Without
+Turnstile, a visitor over the limit just waits. With both keys set, Cloudflare's script loads only
+after a visitor hits their limit. Limits are held in memory, so a restart resets them.
 
 ## Deploying
 

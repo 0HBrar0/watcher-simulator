@@ -32,6 +32,12 @@ only player: one audio element, ranked lines (opening over reactions over musing
 BroadcastChannel so that two open tabs never speak at once. `voice/useVoiceDirector.ts` decides
 when he speaks. `interface/Subtitles.tsx` follows `voiceTime()`, and the eyes follow `isVoiced()`.
 
+## Leave a word
+
+`interface/LeaveAWord.tsx` is the dialog and `interface/word.ts` the only call it makes. The dialog
+keeps every keydown to itself, so typing never reaches the camera or the shortcuts. Its service is
+`uplink-service/`, deployed on its own from that folder.
+
 ## Rendering, far to near
 
 1. `Sky`: expensive noise baked once into a cube map, also used as the image-based light.

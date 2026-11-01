@@ -37,7 +37,7 @@ button {
 button:focus-visible { outline: 1px solid var(--gold); outline-offset: 4px; border-radius: 2px; }
 
 .hud { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
-.hud button, .hud input, .hud label { pointer-events: auto; }
+.hud button, .hud input, .hud label, .hud textarea { pointer-events: auto; }
 .hud > nav, .hud > .modes, .hud > .disclaimer { transition: opacity 1.4s ease; }
 .hud--intro > nav, .hud--intro > .modes, .hud--intro > .disclaimer { opacity: 0; }
 .ready .hud--intro > nav, .ready .hud--intro > .modes, .ready .hud--intro > .disclaimer { opacity: 1; transition-delay: 6.5s; }
@@ -434,6 +434,64 @@ button:focus-visible { outline: 1px solid var(--gold); outline-offset: 4px; bord
 @media (max-width: 760px) {
   .subs { font-size: 22px; bottom: 96px; }
   .hud:has(.info) .subs { left: 50%; width: calc(100vw - 32px); bottom: auto; top: 76px; }
+}
+
+/* A note left on the sky: type and hairlines, like everything else here. */
+.word-button { display: inline-flex; align-items: center; gap: 8px; align-self: center; color: var(--gold); }
+.word-button:hover { color: #fcdc9f; }
+.word-button__iris { transform-origin: center; transition: transform 0.6s var(--ease); }
+.word-button:hover .word-button__iris, .word-button[aria-expanded='true'] .word-button__iris { transform: scale(1.5); }
+
+.word {
+  position: fixed;
+  right: 48px;
+  top: 80px;
+  width: min(372px, calc(100vw - 32px));
+  max-height: calc(100dvh - 96px);
+  overflow-y: auto;
+  scrollbar-width: none;
+  pointer-events: auto;
+  animation: settle 0.7s var(--ease) both;
+}
+.hud:has(.word) .info { opacity: 0; visibility: hidden; }
+.word__head { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.word h2 { font-family: var(--serif); font-size: 40px; font-weight: 300; line-height: 1.1; letter-spacing: -0.008em; }
+.word__lead { font-family: var(--serif); font-style: italic; font-size: 20px; font-weight: 300; line-height: 1.3; color: var(--ink-soft); margin: 6px 0 22px; }
+.word label { display: block; font-size: 12px; letter-spacing: 0.04em; color: var(--gold); }
+.word textarea, .word input[type='text'] {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid var(--rim);
+  outline: 0;
+  padding: 6px 0 8px;
+  background: none;
+  color: var(--ink);
+  caret-color: var(--gold);
+  text-shadow: inherit;
+  transition: border-color 0.3s ease;
+}
+.word textarea { font-family: var(--serif); font-size: 22px; font-weight: 300; line-height: 1.3; resize: none; }
+.word input[type='text'] { font-family: var(--sans); font-size: 15px; margin-top: 10px; animation: settle 0.5s var(--ease) both; }
+.word textarea:focus, .word input[type='text']:focus { border-color: var(--gold); }
+.word small { display: block; margin-top: 8px; font-size: 12px; line-height: 1.45; color: var(--ink); }
+.word__methods { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; margin-top: 22px; font-size: 13px; color: var(--ink); }
+.word__methods button { color: var(--ink); transition: color 0.2s ease; }
+.word__methods button:hover { color: var(--gold); }
+.word__methods button[aria-pressed='true'] { color: var(--gold); }
+.word .primary { display: block; margin-top: 22px; }
+.word .primary:disabled { opacity: 0.6; cursor: default; }
+.word__error { min-height: 1.4em; margin-top: 12px; font-size: 13px; line-height: 1.4; color: var(--gold); }
+.word__sent strong { display: block; font-family: var(--serif); font-size: 30px; font-style: italic; font-weight: 300; color: var(--gold); margin-top: 8px; }
+.word__sent p { font-family: var(--serif); font-size: 20px; font-weight: 300; line-height: 1.3; color: var(--ink-soft); margin-top: 6px; }
+.word__check { margin-top: 18px; font-size: 13px; color: var(--ink-soft); }
+.word__trap { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+@media (max-width: 760px) {
+  .word-button span { display: none; }
+  .word { left: 16px; right: 16px; top: 56px; width: auto; max-height: calc(100dvh - 72px); }
+  .word h2 { font-size: 34px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
