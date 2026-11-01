@@ -22,7 +22,7 @@ React state: shader uniforms, `watcherState`, and `Target.position` are mutated 
 
 `camera/CameraManager.tsx` has one camera in one of three rigs: `orbit`, `travel`, `pov`. Free
 observer and planetary perspective are both `orbit`, differing in pivot and limits. Flights are
-cubic Beziers that bend around bodies (`cameraPath.ts`). A drag, a scroll or a movement key cancels them; a plain click does not. Arrival points
+cubic Beziers that bend around bodies (`cameraPath.ts`). A scroll or a movement key cancels them; clicks and drags do not. Arrival points
 are computed relative to the sun, so you always arrive at the lit side of a world.
 
 ## Voice

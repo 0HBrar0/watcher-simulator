@@ -44,7 +44,7 @@ npm run test:e2e  # end-to-end tests on desktop and phone (first: npx playwright
 | F | Fullscreen |
 | Click a world | Fly to it |
 | Click the Watcher | Choose: approach, or see through his eyes |
-| Drag, scroll or fly mid-flight | Take the camera back (a plain click does not) |
+| Scroll or fly mid-flight | Take the camera back (clicks and drags do not) |
 | Esc | Close what is open, then return to the overview |
 
 The zoom rail appears on the right when you zoom and fades by itself. Rest the pointer on the right

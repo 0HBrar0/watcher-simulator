@@ -23,7 +23,6 @@ const LOOK_RATE = 0.0021 // radians per pixel at the default field of view
 const WHEEL_RATE = 0.00055 // a standard wheel notch of 100 moves about 5.5%
 const PINCH_BOOST = 6 // trackpad pinches report much smaller deltas than a wheel
 const FINE = 0.25 // holding Alt
-const DRAG_SLOP = 6 // pixels a press must travel before it counts as a drag and not a click
 
 const v1 = new Vector3()
 const v2 = new Vector3()
@@ -73,7 +72,6 @@ export function CameraManager() {
     lastInput: -100,
     dragging: 0, // 0 none, 1 orbit, 2 pan
     px: 0, py: 0,
-    downX: 0, downY: 0,
   }).current
 
   const setOrbitFromCamera = () => {
@@ -211,18 +209,17 @@ export function CameraManager() {
       if (!(e.target instanceof HTMLCanvasElement)) return
       s.lastInput = performance.now() / 1000
       s.dragging = e.button === 0 && !e.shiftKey ? 1 : 2
-      s.px = s.downX = e.clientX
-      s.py = s.downY = e.clientY
+      s.px = e.clientX
+      s.py = e.clientY
       dom.setPointerCapture?.(e.pointerId)
     }
     const onMove = (e: PointerEvent) => {
       if (!s.dragging) return
-      // A click leaves a flight alone; only a real drag takes the camera back.
+      // A flight is never stopped by the mouse. Keep tracking it so the look doesn't jump on arrival.
       if (s.rig === 'travel') {
-        if (Math.hypot(e.clientX - s.downX, e.clientY - s.downY) < DRAG_SLOP) return
-        stopFlight()
         s.px = e.clientX
         s.py = e.clientY
+        return
       }
       const dx = e.clientX - s.px, dy = e.clientY - s.py
       s.px = e.clientX
